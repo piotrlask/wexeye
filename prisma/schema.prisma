@@ -1,0 +1,266 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Role: "READER" | "EDITOR" | "ADMIN"
+// ArticleStatus: "DRAFT" | "PENDING" | "PUBLISHED" | "REJECTED"
+// MediaType: "PHOTO" | "VIDEO" | "REEL"
+// PostType: "PHOTO" | "VIDEO" | "STORY" | "ALERT" | "LIVE" | "EVENT" | "OPINION"
+// SourceType: "WITNESSED" | "TOLD" | "FOUND_ONLINE" | "UNKNOWN"
+// PurchaseType: "ARTICLE" | "SUB20" | "SUB30"
+// PurchaseStatus: "PENDING" | "PAID" | "FAILED" | "REFUNDED"
+// SubscriptionStatus: "ACTIVE" | "CANCELED" | "PAST_DUE"
+// Gender: "WOMAN" | "MAN" | "OTHER"
+// FriendshipStatus: "PENDING" | "ACCEPTED"
+// ReactionType: "OK" | "NOT_OK"
+// AdPurchaseStatus: "PENDING" | "PAID" | "ACTIVE" | "EXPIRED"
+// AdRevenueRole: "AUTHOR" | "ADMIN" | "LEVEL1" | "LEVEL2" | "LEVEL3" | "LEVEL4"
+// SQLite has no native enum support in Prisma, so these are validated in app code (see src/lib/constants.ts).
+
+model User {
+  id               String    @id @default(cuid())
+  email            String    @unique
+  passwordHash     String
+  name             String
+  role             String    @default("READER")
+  referralCode     String    @unique @default(cuid())
+  sponsor          User?     @relation("Sponsorship", fields: [sponsorId], references: [id])
+  sponsorId        String?
+  referrals        User[]    @relation("Sponsorship")
+  stripeCustomerId String?
+  createdAt        DateTime  @default(now())
+  articles         Article[]
+  purchases        Purchase[]
+  subscription     Subscription?
+  articleAccess    ArticleAccess[]
+  commissionsEarned Commission[] @relation("CommissionEditor")
+  witnessMarks     Witness[]
+  comments         Comment[]
+
+  // Social profile
+  avatarUrl String?
+  city      String?
+  gender    String?
+  age       Int?
+
+  friendshipsSent     Friendship[] @relation("FriendshipRequester")
+  friendshipsReceived Friendship[] @relation("FriendshipAddressee")
+  shares              Share[]
+  reactions           Reaction[]
+
+  adPurchasesMade     AdPurchase[]     @relation("AdAdvertiser")
+  adPurchasesReceived AdPurchase[]     @relation("AdAuthor")
+  adRevenueShares     AdRevenueShare[]
+}
+
+// A friend connection between two readers, Facebook-style: requester invites,
+// addressee accepts. Only ACCEPTED rows count as actual friends.
+model Friendship {
+  id          String   @id @default(cuid())
+  requester   User     @relation("FriendshipRequester", fields: [requesterId], references: [id])
+  requesterId String
+  addressee   User     @relation("FriendshipAddressee", fields: [addresseeId], references: [id])
+  addresseeId String
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+  respondedAt DateTime?
+
+  @@unique([requesterId, addresseeId])
+}
+
+// A user sharing an article with their friends (visible in friends' feeds).
+model Share {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  articleId String
+  note      String?
+  createdAt DateTime @default(now())
+}
+
+// "OK" (green eye) / "Nie OK" (red eye) reaction on an article — one per user per article.
+model Reaction {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  articleId String
+  type      String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, articleId])
+}
+
+model Article {
+  id           String          @id @default(cuid())
+  title        String
+  body         String          @db.Text
+  category     String
+  postType     String          @default("STORY")
+  subcategory  String?
+  status       String          @default("PENDING")
+  author       User            @relation(fields: [authorId], references: [id])
+  authorId     String
+  media        Media[]
+  createdAt    DateTime        @default(now())
+  publishedAt  DateTime?
+  reviewNote   String?         @db.Text
+  purchases    Purchase[]
+  accessGrants ArticleAccess[]
+  commissions  Commission[]
+
+  // WHERE
+  city           String?
+  region         String?
+  country        String?
+  continent      String?
+  latitude       Float?
+  longitude      Float?
+  locationHidden Boolean @default(false)
+
+  // WHEN (of the event itself, as opposed to createdAt/publishedAt)
+  eventAt DateTime?
+
+  // WHO told it, and how it's tagged
+  sourceType String    @default("UNKNOWN")
+  hashtags   String?   @db.Text // simple space-separated "#tag" string, matched with LIKE for search
+  viewCount  Int       @default(0)
+  witnesses  Witness[]
+  comments   Comment[]
+  shares     Share[]
+  reactions  Reaction[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  body      String   @db.Text
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  articleId String
+  createdAt DateTime @default(now())
+}
+
+// "I witnessed this" mark — one per user per post. Count of rows = witness count.
+model Witness {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  article   Article  @relation(fields: [articleId], references: [id])
+  articleId String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, articleId])
+}
+
+model Media {
+  id        String   @id @default(cuid())
+  type      String
+  url       String   @db.Text
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  articleId String
+  createdAt DateTime @default(now())
+}
+
+// Manual bookkeeping entries created by admin (e.g. flat payouts, expenses) — unrelated to the automatic commission engine below.
+model Payment {
+  id          String   @id @default(cuid())
+  description String
+  amountCents Int
+  currency    String   @default("USD")
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+}
+
+// A single paid unlock: either a one-time article purchase or a subscription checkout.
+model Purchase {
+  id                    String   @id @default(cuid())
+  user                  User     @relation(fields: [userId], references: [id])
+  userId                String
+  type                  String
+  article               Article? @relation(fields: [articleId], references: [id])
+  articleId             String?
+  amountCents           Int
+  status                String   @default("PENDING")
+  stripeCheckoutId      String?  @unique
+  stripePaymentIntentId String?
+  createdAt             DateTime @default(now())
+}
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  user                 User      @relation(fields: [userId], references: [id])
+  userId               String    @unique
+  tier                 String
+  status               String    @default("ACTIVE")
+  stripeSubscriptionId String?   @unique
+  currentPeriodStart   DateTime  @default(now())
+  currentPeriodEnd     DateTime
+  articlesUsedInPeriod Int       @default(0)
+  createdAt            DateTime  @default(now())
+}
+
+// Records that a given user has unlocked a given article, either permanently (ARTICLE purchase)
+// or for the current billing period (subscription quota). Used to gate paywall access.
+model ArticleAccess {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  article    Article  @relation(fields: [articleId], references: [id])
+  articleId  String
+  grantedVia String
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, articleId])
+}
+
+// One row per editor per unlock event: the editor's cut of that payment, based on how many
+// sponsor-levels separate them from the article's author (max 5).
+model Commission {
+  id          String   @id @default(cuid())
+  editor      User     @relation("CommissionEditor", fields: [editorId], references: [id])
+  editorId    String
+  article     Article  @relation(fields: [articleId], references: [id])
+  articleId   String
+  level       Int
+  amountCents Int
+  createdAt   DateTime @default(now())
+}
+
+// A month-long ad slot sold under one author's articles. Up to 3 can be
+// ACTIVE for a given author at once — see AD_SLOTS_PER_AUTHOR.
+model AdPurchase {
+  id            String    @id @default(cuid())
+  advertiser    User      @relation("AdAdvertiser", fields: [advertiserId], references: [id])
+  advertiserId  String
+  author        User      @relation("AdAuthor", fields: [authorId], references: [id])
+  authorId      String
+  status        String    @default("PENDING")
+  amountCents   Int
+  stripeCheckoutId String? @unique
+  mediaType     String?
+  mediaUrl      String?   @db.Text
+  linkUrl       String?   @db.Text
+  startsAt      DateTime?
+  endsAt        DateTime?
+  createdAt     DateTime  @default(now())
+  revenueShares AdRevenueShare[]
+}
+
+// One row per payee for a given ad purchase's 30/30/10/10/10/10 split.
+model AdRevenueShare {
+  id          String     @id @default(cuid())
+  purchase    AdPurchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  purchaseId  String
+  user        User       @relation(fields: [userId], references: [id])
+  userId      String
+  role        String
+  amountCents Int
+  createdAt   DateTime   @default(now())
+}

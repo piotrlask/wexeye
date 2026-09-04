@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { hasStaffAccess } from "@/lib/access";
 import { getTeamTree, countDescendants } from "@/lib/team";
 import ContentForm from "./ContentForm";
 import TeamTreeView from "@/components/TeamTreeView";
@@ -25,7 +26,9 @@ export default async function DodajPage({
 }) {
   const session = await auth();
   const userId = session?.user?.id;
-  if (!userId) return null;
+  // Defense in depth: middleware.ts already gates this route to EDITOR/ADMIN,
+  // but the page itself must not rely on that alone (see CLAUDE.md #8).
+  if (!userId || !(await hasStaffAccess(userId))) return null;
 
   const { tab: rawTab } = await searchParams;
   const tab: TabKey = TABS.some((t) => t.key === rawTab) ? (rawTab as TabKey) : "tresci";

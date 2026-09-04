@@ -6,6 +6,7 @@ import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { hasStaffAccess } from "@/lib/access";
 import { CATEGORIES, POST_TYPES, SOURCE_TYPES } from "@/lib/constants";
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -41,6 +42,13 @@ export async function addContentAction(
   const session = await auth();
   if (!session?.user?.id) {
     return { error: "Musisz być zalogowany." };
+  }
+  // Defense in depth: middleware.ts already gates /panel/dodaj to EDITOR/ADMIN,
+  // but this Server Action is reachable as its own endpoint and must not rely
+  // on that alone (see CLAUDE.md #8 — role checks belong in the code that
+  // performs the operation, not just the route in front of it).
+  if (!(await hasStaffAccess(session.user.id))) {
+    return { error: "Nie masz uprawnień do dodawania treści." };
   }
 
   const title = String(formData.get("title") ?? "").trim();

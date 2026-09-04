@@ -4,8 +4,16 @@ import crypto from "node:crypto";
 
 const prisma = new PrismaClient();
 
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Brak wymaganej zmiennej środowiskowej ${name}. Ustaw ją przed uruchomieniem skryptu.`);
+  }
+  return value;
+}
+
 async function main() {
-  const adminEmail = "admin@example.com";
+  const adminEmail = requireEnv("SEED_ADMIN_EMAIL");
   const existing = await prisma.user.findUnique({ where: { email: adminEmail } });
   if (existing) {
     console.log("Konto admina już istnieje:", adminEmail);

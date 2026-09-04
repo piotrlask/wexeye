@@ -29,9 +29,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — .env and any .env.* variant is ignored, EXCEPT the committed
+# template (.env.example), which must only ever contain placeholder values.
 .env
 .env.*
+!.env.example
 
 # secrets / credentials
 *.pem

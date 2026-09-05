@@ -2,6 +2,7 @@
 
 import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
+import { getSafeRedirectPath } from "@/lib/redirect";
 
 export async function loginAction(
   _prevState: { error?: string } | undefined,
@@ -10,7 +11,7 @@ export async function loginAction(
   const email = formData.get("email");
   const password = formData.get("password");
   const next = String(formData.get("next") ?? "");
-  const redirectTo = next.startsWith("/") ? next : "/panel";
+  const redirectTo = getSafeRedirectPath(next, "/panel");
 
   try {
     await signIn("credentials", { email, password, redirectTo });

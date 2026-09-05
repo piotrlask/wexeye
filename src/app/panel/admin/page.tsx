@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getAllTeamTrees, countDescendants } from "@/lib/team";
 import CreateEditorForm from "./CreateEditorForm";
@@ -20,6 +21,13 @@ export default async function AdminPage({
 }: {
   searchParams: Promise<{ tab?: string }>;
 }) {
+  const session = await auth();
+  // Defense in depth: middleware.ts already gates /panel/admin to ADMIN,
+  // but this page must not rely on that alone (see CLAUDE.md #8 — same fix
+  // already applied to /panel/dodaj). Checked before any admin data is
+  // fetched, since ManagementTab/TeamTab below only run once we reach here.
+  if (session?.user?.role !== "ADMIN") return null;
+
   const { tab: rawTab } = await searchParams;
   const tab: TabKey = TABS.some((t) => t.key === rawTab) ? (rawTab as TabKey) : "zarzadzanie";
 

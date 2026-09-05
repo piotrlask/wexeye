@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
+import { getClientIp, checkRegisterRateLimit, recordRegisterAttempt } from "@/lib/rateLimit";
 
 export type RegisterState = { error?: string };
 
@@ -11,6 +12,15 @@ export async function registerAction(
   _prevState: RegisterState | undefined,
   formData: FormData
 ): Promise<RegisterState> {
+  const ip = await getClientIp();
+  if (!(await checkRegisterRateLimit(ip))) {
+    return { error: "Zbyt wiele prób rejestracji z tego miejsca. Spróbuj ponownie później." };
+  }
+  // Recorded for every attempt reaching this point (not just successful
+  // ones) — otherwise a script submitting many duplicate/invalid requests
+  // would never count against the limit at all.
+  await recordRegisterAttempt(ip);
+
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");

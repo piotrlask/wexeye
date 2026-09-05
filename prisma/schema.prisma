@@ -20,6 +20,7 @@ datasource db {
 // ReactionType: "OK" | "NOT_OK"
 // AdPurchaseStatus: "PENDING" | "PAID" | "ACTIVE" | "EXPIRED"
 // AdRevenueRole: "AUTHOR" | "ADMIN" | "LEVEL1" | "LEVEL2" | "LEVEL3" | "LEVEL4"
+// AuthAttemptKind: "LOGIN" | "REGISTER"
 // SQLite has no native enum support in Prisma, so these are validated in app code (see src/lib/constants.ts).
 
 model User {
@@ -263,4 +264,23 @@ model AdRevenueShare {
   role        String
   amountCents Int
   createdAt   DateTime   @default(now())
+}
+
+// One row per rate-limited login/registration attempt (login: only failed
+// attempts; registration: every attempt), used to throttle brute-force login
+// and mass account creation. `email` is only ever combined with `ip` for
+// limiting purposes — never used on its own — so a third party can't lock a
+// real user out of their account just by failing their login repeatedly from
+// elsewhere. See src/lib/rateLimit.ts. Rows older than the relevant window
+// are pruned opportunistically (no cron); this table is not meant to grow
+// without bound.
+model AuthAttempt {
+  id        String   @id @default(cuid())
+  kind      String
+  ip        String
+  email     String?
+  createdAt DateTime @default(now())
+
+  @@index([kind, ip, createdAt])
+  @@index([kind, email, createdAt])
 }

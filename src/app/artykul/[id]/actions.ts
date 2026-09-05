@@ -15,6 +15,11 @@ export async function unlockWithSubscriptionAction(articleId: string): Promise<U
     return { error: "Musisz być zalogowany." };
   }
 
+  const article = await prisma.article.findUnique({ where: { id: articleId }, select: { status: true } });
+  if (!article || article.status !== "PUBLISHED") {
+    return { error: "Artykuł nie jest dostępny." };
+  }
+
   const result = await consumeSubscriptionQuota(session.user.id, articleId);
   if (result === "no-quota") {
     return { error: "Brak dostępnego limitu w Twojej subskrypcji." };
@@ -57,6 +62,11 @@ export async function addCommentAction(
     return { error: "Komentarz jest za długi (max 2000 znaków)." };
   }
 
+  const article = await prisma.article.findUnique({ where: { id: articleId }, select: { status: true } });
+  if (!article || article.status !== "PUBLISHED") {
+    return { error: "Artykuł nie jest dostępny." };
+  }
+
   await prisma.comment.create({
     data: { body, articleId, authorId: session.user.id },
   });
@@ -72,6 +82,11 @@ export async function setReactionAction(articleId: string, type: "OK" | "NOT_OK"
   const session = await auth();
   if (!session?.user?.id) {
     return { error: "Musisz być zalogowany." };
+  }
+
+  const article = await prisma.article.findUnique({ where: { id: articleId }, select: { status: true } });
+  if (!article || article.status !== "PUBLISHED") {
+    return { error: "Artykuł nie jest dostępny." };
   }
 
   const existing = await prisma.reaction.findUnique({
@@ -100,6 +115,11 @@ export async function shareWithFriendsAction(articleId: string): Promise<ShareSt
     return { error: "Musisz być zalogowany." };
   }
 
+  const article = await prisma.article.findUnique({ where: { id: articleId }, select: { status: true } });
+  if (!article || article.status !== "PUBLISHED") {
+    return { error: "Artykuł nie jest dostępny." };
+  }
+
   await prisma.share.create({
     data: { userId: session.user.id, articleId },
   });
@@ -115,6 +135,11 @@ export async function markWitnessAction(articleId: string): Promise<WitnessState
   const session = await auth();
   if (!session?.user?.id) {
     return { error: "Musisz być zalogowany." };
+  }
+
+  const article = await prisma.article.findUnique({ where: { id: articleId }, select: { status: true } });
+  if (!article || article.status !== "PUBLISHED") {
+    return { error: "Artykuł nie jest dostępny." };
   }
 
   await prisma.witness.upsert({

@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { auth } from "@/auth";
 import { CATEGORIES } from "@/lib/constants";
 import { getFeedPosts } from "@/lib/feed";
 import PostCard from "@/components/PostCard";
 
 export default async function EksplorujPage() {
-  const posts = await getFeedPosts({ tab: "trending" });
+  const session = await auth();
+  const posts = await getFeedPosts({ tab: "trending", userId: session?.user?.id });
 
   return (
     <div>

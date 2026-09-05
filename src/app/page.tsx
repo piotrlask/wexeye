@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { auth } from "@/auth";
 import { CATEGORIES, FEED_TABS, type FeedTabKey } from "@/lib/constants";
 import { getFeedPosts } from "@/lib/feed";
 import PostCard from "@/components/PostCard";
@@ -21,7 +22,8 @@ export default async function HomePage({
   const lat = params.lat ? Number(params.lat) : undefined;
   const lng = params.lng ? Number(params.lng) : undefined;
 
-  const posts = await getFeedPosts({ tab, category, lat, lng });
+  const session = await auth();
+  const posts = await getFeedPosts({ tab, category, lat, lng, userId: session?.user?.id });
 
   function tabHref(key: FeedTabKey) {
     const qs = new URLSearchParams();

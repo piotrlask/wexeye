@@ -1,4 +1,6 @@
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getAccessibleArticleIds, previewBody } from "@/lib/access";
 import PostCard from "@/components/PostCard";
 import type { FeedPost } from "@/lib/feed";
 
@@ -14,10 +16,16 @@ export default async function SzukajPage({
   let people: { id: string; name: string; role: string }[] = [];
 
   if (query) {
+    const session = await auth();
+
     const [articles, users] = await Promise.all([
       prisma.article.findMany({
         where: {
           status: "PUBLISHED",
+          // Matching against the full body (including the paid half) is fine
+          // to do server-side — only the returned result is access-limited
+          // below, so a match inside paywalled text still surfaces the
+          // article, just without revealing the matched text itself.
           OR: [
             { title: { contains: query } },
             { body: { contains: query } },
@@ -37,8 +45,13 @@ export default async function SzukajPage({
       }),
     ]);
 
+    // Same rule as the feed: an article the viewer hasn't unlocked only ever
+    // gets its free preview sent to the client, never the full body.
+    const accessibleIds = await getAccessibleArticleIds(session?.user?.id, articles.map((a) => a.id));
+
     posts = articles.map((a) => ({
       ...a,
+      body: accessibleIds.has(a.id) ? a.body : previewBody(a.body),
       witnessCount: a._count.witnesses,
       commentCount: a._count.comments,
     }));

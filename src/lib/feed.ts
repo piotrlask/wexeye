@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { haversineKm } from "@/lib/geo";
+import { getAccessibleArticleIds, previewBody } from "@/lib/access";
 import { FEED_TABS, type FeedTabKey } from "@/lib/constants";
 import type { Article, Media, User } from "@prisma/client";
 
@@ -19,8 +20,9 @@ export async function getFeedPosts(params: {
   category?: string;
   lat?: number;
   lng?: number;
+  userId?: string;
 }): Promise<FeedPost[]> {
-  const { tab, category, lat, lng } = params;
+  const { tab, category, lat, lng, userId } = params;
   const tabDef = FEED_TABS.find((t) => t.key === tab);
   const tabCategory = tabDef && "category" in tabDef ? tabDef.category : undefined;
 
@@ -41,8 +43,13 @@ export async function getFeedPosts(params: {
     take: 50,
   });
 
+  // Articles the viewer hasn't unlocked ship only the free preview — never
+  // the full body — so the paywalled text never leaves the server for them.
+  const accessibleIds = await getAccessibleArticleIds(userId, articles.map((a) => a.id));
+
   let posts: FeedPost[] = articles.map((a) => ({
     ...a,
+    body: accessibleIds.has(a.id) ? a.body : previewBody(a.body),
     witnessCount: a._count.witnesses,
     commentCount: a._count.comments,
   }));

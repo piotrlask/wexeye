@@ -76,7 +76,12 @@ export async function uploadAdCreativeAction(
   const buffer = Buffer.from(await file.arrayBuffer());
   await writeFile(path.join(uploadsDir, filename), buffer);
 
-  await activateAdPurchase(purchaseId, mediaType, `/uploads/${filename}`, linkUrl);
+  const result = await activateAdPurchase(purchaseId, mediaType, `/uploads/${filename}`, linkUrl);
+  if (result === "slot-full") {
+    return {
+      error: "Wszystkie miejsca reklamowe u tego autora są już zajęte. Skontaktuj się z obsługą w sprawie zwrotu.",
+    };
+  }
 
   revalidatePath(`/reklama/${purchaseId}`);
   return { success: true };

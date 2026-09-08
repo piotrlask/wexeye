@@ -7,6 +7,18 @@ export async function hasStaffAccess(userId: string | undefined): Promise<boolea
   return user?.role === "EDITOR" || user?.role === "ADMIN";
 }
 
+/**
+ * Fresh DB check for ADMIN specifically (not EDITOR-or-ADMIN like
+ * hasStaffAccess). Session/JWT role can go stale after a DB role change until
+ * the token is refreshed — callers gating ADMIN-only pages/actions must use
+ * this instead of trusting session.user.role.
+ */
+export async function isAdmin(userId: string | undefined): Promise<boolean> {
+  if (!userId) return false;
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+  return user?.role === "ADMIN";
+}
+
 export async function hasArticleAccess(userId: string | undefined, articleId: string): Promise<boolean> {
   if (!userId) return false;
   if (await hasStaffAccess(userId)) return true;

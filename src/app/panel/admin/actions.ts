@@ -5,10 +5,14 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ROLES } from "@/lib/constants";
+import { isAdmin } from "@/lib/access";
 
 async function requireAdmin() {
   const session = await auth();
-  if (session?.user?.role !== "ADMIN") {
+  // session.user.role comes from the JWT and can be stale after a DB role
+  // change (see CLAUDE.md JWT role staleness audit) — re-verify against the
+  // current DB record before allowing any admin action.
+  if (!session?.user?.id || !(await isAdmin(session.user.id))) {
     throw new Error("Brak uprawnień.");
   }
   return session;

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { isAdmin } from "@/lib/access";
 import { getAllTeamTrees, countDescendants } from "@/lib/team";
 import CreateEditorForm from "./CreateEditorForm";
 import PaymentForm from "./PaymentForm";
@@ -24,9 +25,11 @@ export default async function AdminPage({
   const session = await auth();
   // Defense in depth: middleware.ts already gates /panel/admin to ADMIN,
   // but this page must not rely on that alone (see CLAUDE.md #8 — same fix
-  // already applied to /panel/dodaj). Checked before any admin data is
-  // fetched, since ManagementTab/TeamTab below only run once we reach here.
-  if (session?.user?.role !== "ADMIN") return null;
+  // already applied to /panel/dodaj). session.user.role comes from the JWT
+  // and can be stale after a DB role change, so re-verify against the
+  // current DB record — checked before any admin data is fetched, since
+  // ManagementTab/TeamTab below only run once we reach here.
+  if (!session?.user?.id || !(await isAdmin(session.user.id))) return null;
 
   const { tab: rawTab } = await searchParams;
   const tab: TabKey = TABS.some((t) => t.key === rawTab) ? (rawTab as TabKey) : "zarzadzanie";

@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ROLES } from "@/lib/constants";
 import { isAdmin } from "@/lib/access";
+import { isValidEmail } from "@/lib/email";
 
 async function requireAdmin() {
   const session = await auth();
@@ -34,14 +35,17 @@ export async function createEditorAction(
   if (!name || !email || !password) {
     return { error: "Imię, e-mail i hasło są wymagane." };
   }
-  if (password.length < 6) {
-    return { error: "Hasło musi mieć min. 6 znaków." };
+  if (!isValidEmail(email)) {
+    return { error: "Podaj prawidłowy adres e-mail." };
+  }
+  if (password.length < 10) {
+    return { error: "Hasło musi mieć co najmniej 10 znaków." };
   }
   if (!ROLES.includes(role as (typeof ROLES)[number])) {
     return { error: "Nieprawidłowa rola." };
   }
 
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
   if (existing) {
     return { error: "Użytkownik z tym e-mailem już istnieje." };
   }
@@ -53,8 +57,22 @@ export async function createEditorAction(
   return { success: true };
 }
 
-export async function moderateArticleAction(articleId: string, approve: boolean, note?: string) {
+export async function moderateArticleAction(
+  articleId: string,
+  approve: boolean,
+  note?: string
+): Promise<FormState> {
   await requireAdmin();
+
+  // Neither this app nor any admin action ever deletes an Article, so there
+  // is no real window for the row to disappear between this check and the
+  // update below — this pre-check alone is enough to keep a bad/stale ID
+  // (typed by hand, or a tampered direct call to this action) from
+  // surfacing as an unhandled Prisma P2025 (500) instead of a normal result.
+  const article = await prisma.article.findUnique({ where: { id: articleId }, select: { id: true } });
+  if (!article) {
+    return { error: "Artykuł nie istnieje." };
+  }
 
   await prisma.article.update({
     where: { id: articleId },
@@ -65,6 +83,7 @@ export async function moderateArticleAction(articleId: string, approve: boolean,
 
   revalidatePath("/panel/admin");
   revalidatePath("/");
+  return { success: true };
 }
 
 export async function addPaymentAction(
@@ -88,8 +107,18 @@ export async function addPaymentAction(
   return { success: true };
 }
 
-export async function markPaymentPaidAction(paymentId: string) {
+export async function markPaymentPaidAction(paymentId: string): Promise<FormState> {
   await requireAdmin();
+
+  // Same reasoning as moderateArticleAction above: Payment rows are never
+  // deleted anywhere in this app, so this pre-check is sufficient to turn a
+  // bad/nonexistent ID into a normal result instead of an unhandled P2025.
+  const payment = await prisma.payment.findUnique({ where: { id: paymentId }, select: { id: true } });
+  if (!payment) {
+    return { error: "Płatność nie istnieje." };
+  }
+
   await prisma.payment.update({ where: { id: paymentId }, data: { status: "PAID" } });
   revalidatePath("/panel/admin");
+  return { success: true };
 }

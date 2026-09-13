@@ -5,7 +5,7 @@ import type { MapPost } from "@/components/WorldMap";
 export default async function MapaPage() {
   const articles = await prisma.article.findMany({
     where: { status: "PUBLISHED", locationHidden: false, latitude: { not: null }, longitude: { not: null } },
-    include: { author: true, media: true },
+    include: { author: { select: { name: true } }, media: true },
     orderBy: { publishedAt: "desc" },
     take: 200,
   });

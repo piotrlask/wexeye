@@ -1,8 +1,15 @@
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasArticleAccess, hasStaffAccess } from "@/lib/access";
-import { POST_TYPE_LABELS, SOURCE_TYPE_LABELS, type PostType, type SourceType } from "@/lib/constants";
+import {
+  POST_TYPE_LABELS,
+  SOURCE_TYPE_LABELS,
+  ARTICLE_VIEW_COOKIE_PREFIX,
+  type PostType,
+  type SourceType,
+} from "@/lib/constants";
 import CheckoutButtons from "@/components/CheckoutButtons";
 import UnlockButton from "./UnlockButton";
 import WitnessButton from "./WitnessButton";
@@ -11,6 +18,7 @@ import ReactionButtons from "./ReactionButtons";
 import ShareButton from "./ShareButton";
 import Avatar from "@/components/Avatar";
 import AdSlots from "@/components/AdSlots";
+import ViewTracker from "./ViewTracker";
 
 export default async function ArticlePage({
   params,
@@ -20,7 +28,11 @@ export default async function ArticlePage({
   const { id } = await params;
   const article = await prisma.article.findUnique({
     where: { id },
-    include: { author: true, media: true, _count: { select: { witnesses: true, comments: true } } },
+    include: {
+      author: { select: { name: true } },
+      media: true,
+      _count: { select: { witnesses: true, comments: true } },
+    },
   });
 
   if (!article || article.status !== "PUBLISHED") {
@@ -44,11 +56,21 @@ export default async function ArticlePage({
     prisma.reaction.count({ where: { articleId: article.id, type: "NOT_OK" } }),
     prisma.comment.findMany({
       where: { articleId: article.id },
-      include: { author: true },
+      include: { author: { select: { name: true, avatarUrl: true } } },
       orderBy: { createdAt: "desc" },
     }),
-    prisma.article.update({ where: { id: article.id }, data: { viewCount: { increment: 1 } } }),
   ]);
+
+  // The view itself is counted client-side (see ViewTracker) rather than
+  // here — a plain Server Component render can't set the dedupe cookie
+  // (Next.js only allows that from a Server Action/Route Handler), and doing
+  // it unconditionally here is exactly what let a bare HTTP GET (curl, a
+  // refresh script) inflate viewCount with zero client involvement. This
+  // read is only for the "wyświetleń" count shown below.
+  const cookieStore = await cookies();
+  const alreadyViewedRecently = Boolean(
+    cookieStore.get(`${ARTICLE_VIEW_COOKIE_PREFIX}${article.id}`)
+  );
 
   const subscriptionUsable =
     !!subscription &&
@@ -161,9 +183,11 @@ export default async function ArticlePage({
         </p>
       )}
 
+      {!alreadyViewedRecently && <ViewTracker articleId={article.id} />}
+
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4 text-sm text-black/50 dark:border-white/10 dark:text-white/50">
         <span>
-          {article.viewCount + 1} wyświetleń · {article._count.comments}{" "}
+          {article.viewCount + (alreadyViewedRecently ? 0 : 1)} wyświetleń · {article._count.comments}{" "}
           {article._count.comments === 1 ? "komentarz" : "komentarzy"}
         </span>
         <div className="flex flex-wrap items-center gap-3">

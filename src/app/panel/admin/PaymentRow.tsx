@@ -26,7 +26,7 @@ export default function PaymentRow({
       ) : (
         <button
           disabled={isPending}
-          onClick={() => startTransition(() => markPaymentPaidAction(paymentId))}
+          onClick={() => startTransition(() => { void markPaymentPaidAction(paymentId); })}
           className="rounded border px-3 py-1 disabled:opacity-50"
         >
           Oznacz jako opłacone

@@ -62,10 +62,13 @@ export default async function AdminPage({
 async function ManagementTab() {
   const [team, pendingArticles, payments, commissionTotals, revenue, adRevenueTotals, activeAds, adRevenueTotal] =
     await Promise.all([
-      prisma.user.findMany({ orderBy: { createdAt: "asc" } }),
+      prisma.user.findMany({
+        orderBy: { createdAt: "asc" },
+        select: { id: true, name: true, email: true, role: true },
+      }),
       prisma.article.findMany({
         where: { status: "PENDING" },
-        include: { author: true },
+        include: { author: { select: { name: true } } },
         orderBy: { createdAt: "asc" },
       }),
       prisma.payment.findMany({ orderBy: { createdAt: "desc" } }),
@@ -77,7 +80,7 @@ async function ManagementTab() {
         // its own — so this must also filter by endsAt, or the admin panel
         // keeps listing lapsed ads as currently running.
         where: { status: "ACTIVE", endsAt: { gt: new Date() } },
-        include: { advertiser: true, author: true },
+        include: { advertiser: { select: { name: true } }, author: { select: { name: true } } },
         orderBy: { startsAt: "asc" },
       }),
       prisma.adPurchase.aggregate({ where: { status: { in: ["PAID", "ACTIVE", "EXPIRED"] } }, _sum: { amountCents: true } }),

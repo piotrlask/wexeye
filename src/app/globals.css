@@ -24,3 +24,16 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Used by EyeIcon — kept as a stylesheet rule instead of an inline style
+   attribute so it doesn't need 'unsafe-inline' in the CSP style-src. */
+.wx-eye-mask {
+  -webkit-mask-image: url(/wexeye-eye.png);
+  mask-image: url(/wexeye-eye.png);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  mask-position: center;
+}

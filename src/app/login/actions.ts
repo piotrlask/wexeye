@@ -1,9 +1,9 @@
 "use server";
 
 import { signIn } from "@/auth";
-import { AuthError } from "next-auth";
+import { AuthError, CredentialsSignin } from "next-auth";
 import { getSafeRedirectPath } from "@/lib/redirect";
-import { getClientIp, checkLoginRateLimit, recordFailedLogin } from "@/lib/rateLimit";
+import { getClientIp, checkLoginRateLimit } from "@/lib/rateLimit";
 
 export async function loginAction(
   _prevState: { error?: string } | undefined,
@@ -17,10 +17,12 @@ export async function loginAction(
   const emailKey = typeof email === "string" ? email.trim().toLowerCase() : "";
   const ip = await getClientIp();
 
-  // Checked before signIn — and therefore before authorize()'s bcrypt.compare
-  // — so a rate-limited request never pays for password verification, and
-  // never reaches the point where it could distinguish "wrong password" from
-  // "no such account" by timing.
+  // This is a UX shortcut, not the security boundary: it lets an
+  // already-over-limit submission skip straight to the friendly message
+  // instead of paying for a signIn() round-trip. The actual, unbypassable
+  // enforcement — including recording this as a failed attempt — lives in
+  // authorize() (src/auth.ts), since that's the one path every credentials
+  // sign-in goes through, form or not.
   if (!(await checkLoginRateLimit(ip, emailKey))) {
     return { error: "Zbyt wiele prób logowania. Spróbuj ponownie za kilka minut." };
   }
@@ -29,10 +31,12 @@ export async function loginAction(
     await signIn("credentials", { email, password, redirectTo });
     return {};
   } catch (err) {
+    if (err instanceof CredentialsSignin && err.code === "rate_limited") {
+      return { error: "Zbyt wiele prób logowania. Spróbuj ponownie za kilka minut." };
+    }
     if (err instanceof AuthError) {
-      // Only failed attempts count against the limit — a successful login
-      // never reaches this branch (signIn redirects instead of returning).
-      await recordFailedLogin(ip, emailKey);
+      // authorize() itself already recorded this failed attempt — recording
+      // it again here would double-count the same attempt against the limit.
       return { error: "Nieprawidłowy e-mail lub hasło." };
     }
     throw err;

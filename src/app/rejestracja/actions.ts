@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
 import { getClientIp, checkRegisterRateLimit, recordRegisterAttempt } from "@/lib/rateLimit";
+import { isValidEmail } from "@/lib/email";
 
 export type RegisterState = { error?: string };
 
@@ -29,16 +30,24 @@ export async function registerAction(
   if (!name || !email || !password) {
     return { error: "Imię, e-mail i hasło są wymagane." };
   }
-  if (password.length < 6) {
-    return { error: "Hasło musi mieć min. 6 znaków." };
+  if (!isValidEmail(email)) {
+    return { error: "Podaj prawidłowy adres e-mail." };
+  }
+  if (password.length < 10) {
+    return { error: "Hasło musi mieć co najmniej 10 znaków." };
   }
   if (password !== passwordConfirm) {
     return { error: "Hasła nie są identyczne." };
   }
 
-  const existing = await prisma.user.findUnique({ where: { email } });
+  // Neutral response on purpose: a direct "this email already has an
+  // account" message lets anyone enumerate registered addresses. We still
+  // can't fully hide the difference (a genuinely new email logs the visitor
+  // straight into /panel; an existing one just re-shows this page), but we
+  // no longer say outright which case occurred.
+  const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
   if (existing) {
-    return { error: "Konto z tym e-mailem już istnieje." };
+    return { error: "Jeśli podany adres może zostać użyty do rejestracji, konto zostanie utworzone." };
   }
 
   const passwordHash = await bcrypt.hash(password, 10);

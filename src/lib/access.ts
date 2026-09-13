@@ -19,6 +19,17 @@ export async function isAdmin(userId: string | undefined): Promise<boolean> {
   return user?.role === "ADMIN";
 }
 
+/**
+ * Fresh DB check for READER, mirroring isAdmin()/hasStaffAccess() — used to
+ * gate the READER-only "become an editor" self-promotion so a stale JWT role
+ * can't let an already-promoted (or demoted) account re-trigger it.
+ */
+export async function isReader(userId: string | undefined): Promise<boolean> {
+  if (!userId) return false;
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+  return user?.role === "READER";
+}
+
 export async function hasArticleAccess(userId: string | undefined, articleId: string): Promise<boolean> {
   if (!userId) return false;
   if (await hasStaffAccess(userId)) return true;

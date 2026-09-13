@@ -11,7 +11,7 @@ export default async function AdCreativePage({ params }: { params: Promise<{ id:
 
   const purchase = await prisma.adPurchase.findUnique({
     where: { id },
-    include: { author: true },
+    include: { author: { select: { name: true } } },
   });
   if (!purchase || purchase.advertiserId !== session.user.id) notFound();
 

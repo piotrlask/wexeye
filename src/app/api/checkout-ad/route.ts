@@ -32,7 +32,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Wszystkie miejsca reklamowe u tego autora są zajęte." }, { status: 409 });
   }
 
-  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { id: true, email: true, name: true, stripeCustomerId: true },
+  });
   if (!user) {
     return NextResponse.json({ error: "Nie znaleziono użytkownika." }, { status: 404 });
   }

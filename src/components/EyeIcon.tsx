@@ -7,17 +7,7 @@ export default function EyeIcon({ className }: { className?: string }) {
   return (
     <span
       aria-hidden
-      className={`inline-block shrink-0 bg-current ${className ?? ""}`}
-      style={{
-        WebkitMaskImage: "url(/wexeye-eye.png)",
-        maskImage: "url(/wexeye-eye.png)",
-        WebkitMaskRepeat: "no-repeat",
-        maskRepeat: "no-repeat",
-        WebkitMaskSize: "contain",
-        maskSize: "contain",
-        WebkitMaskPosition: "center",
-        maskPosition: "center",
-      }}
+      className={`inline-block shrink-0 bg-current wx-eye-mask ${className ?? ""}`}
     />
   );
 }

@@ -6,6 +6,7 @@ import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { isReader } from "@/lib/access";
 import { MAX_DIRECT_REFERRALS, GENDERS } from "@/lib/constants";
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
@@ -25,7 +26,10 @@ export async function becomeEditorAction(
   if (!session?.user?.id) {
     return { error: "Musisz być zalogowany." };
   }
-  if (session.user.role !== "READER") {
+  // session.user.role comes from the JWT and can be stale after a DB role
+  // change (see CLAUDE.md JWT role staleness audit) — re-verify against the
+  // current DB record, same as isAdmin()/hasStaffAccess() elsewhere.
+  if (!(await isReader(session.user.id))) {
     return { error: "To konto nie może dołączyć do zespołu redakcyjnego." };
   }
 

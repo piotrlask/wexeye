@@ -2,10 +2,13 @@ import { prisma } from "@/lib/prisma";
 import { haversineKm } from "@/lib/geo";
 import { getAccessibleArticleIds, previewBody } from "@/lib/access";
 import { FEED_TABS, type FeedTabKey } from "@/lib/constants";
-import type { Article, Media, User } from "@prisma/client";
+import type { Article, Media } from "@prisma/client";
 
 export type FeedPost = Article & {
-  author: User;
+  // PostCard only ever renders the author's name — select just that instead
+  // of pulling the full User row (passwordHash, stripeCustomerId, etc.)
+  // into every feed/search query.
+  author: { name: string };
   media: Media[];
   witnessCount: number;
   commentCount: number;
@@ -38,7 +41,11 @@ export async function getFeedPosts(params: {
 
   const articles = await prisma.article.findMany({
     where,
-    include: { author: true, media: true, _count: { select: { witnesses: true, comments: true } } },
+    include: {
+      author: { select: { name: true } },
+      media: true,
+      _count: { select: { witnesses: true, comments: true } },
+    },
     orderBy,
     take: 50,
   });

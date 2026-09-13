@@ -165,3 +165,17 @@ export type AdRevenueRole = keyof typeof AD_REVENUE_SPLIT_PCT;
 
 export const AD_PURCHASE_STATUSES = ["PENDING", "PAID", "ACTIVE", "EXPIRED"] as const;
 export type AdPurchaseStatus = (typeof AD_PURCHASE_STATUSES)[number];
+
+// --- Article view counting ---------------------------------------------------
+//
+// viewCount only increments through recordArticleViewAction, called from a
+// small Client Component after the article page actually mounts in a real
+// browser — never from the page's own Server Component render. That means a
+// plain HTTP GET (curl, a naive scraper, a refresh script) never executes any
+// JS and therefore never counts, without needing to store an IP or add any
+// infrastructure. The action itself also skips the increment if the viewer's
+// browser already carries this article's dedupe cookie, so a genuine refresh
+// within the window doesn't inflate the count either.
+
+export const ARTICLE_VIEW_COOKIE_PREFIX = "wxv_";
+export const ARTICLE_VIEW_DEDUPE_SECONDS = 60 * 60 * 4; // 4h

@@ -34,7 +34,11 @@ export default async function SzukajPage({
             { country: { contains: query } },
           ],
         },
-        include: { author: true, media: true, _count: { select: { witnesses: true, comments: true } } },
+        include: {
+          author: { select: { name: true } },
+          media: true,
+          _count: { select: { witnesses: true, comments: true } },
+        },
         orderBy: { publishedAt: "desc" },
         take: 30,
       }),

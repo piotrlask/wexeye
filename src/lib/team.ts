@@ -24,7 +24,10 @@ export type TeamNode = {
  * are in the tree.
  */
 export async function getTeamTree(rootUserId: string): Promise<TeamNode | null> {
-  const root = await prisma.user.findUnique({ where: { id: rootUserId } });
+  const root = await prisma.user.findUnique({
+    where: { id: rootUserId },
+    select: { id: true, name: true, email: true, role: true },
+  });
   if (!root) return null;
 
   const usersById = new Map<string, { id: string; name: string; email: string; role: string }>();

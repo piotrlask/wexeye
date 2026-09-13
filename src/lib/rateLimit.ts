@@ -45,8 +45,7 @@ const MAX_WINDOW_MS = Math.max(LOGIN_IP_WINDOW_MS, LOGIN_IP_EMAIL_WINDOW_MS, REG
  * so rate limiting still groups requests together (fail toward "shared
  * bucket", not toward "unlimited") if the header is ever missing.
  */
-export async function getClientIp(): Promise<string> {
-  const h = await headers();
+function ipFromHeaders(h: Headers): string {
   const forwarded = h.get("x-forwarded-for");
   if (forwarded) {
     const first = forwarded.split(",")[0]?.trim();
@@ -55,6 +54,25 @@ export async function getClientIp(): Promise<string> {
   const realIp = h.get("x-real-ip");
   if (realIp) return realIp;
   return "unknown";
+}
+
+/** Client IP for callers with access to Next.js's request-scoped `headers()` (Server Actions, Route Handlers). */
+export async function getClientIp(): Promise<string> {
+  return ipFromHeaders(await headers());
+}
+
+/**
+ * Client IP for callers holding the raw `Request` object directly — namely
+ * NextAuth's `Credentials.authorize()`, which Auth.js always passes the
+ * original request as its second argument (see src/auth.ts). Using it there
+ * instead of `getClientIp()` sidesteps any doubt about whether Next.js's
+ * request-scoped `headers()` is reliably readable from inside Auth.js core's
+ * own request handling — the `request` argument is guaranteed to be the
+ * genuine inbound request regardless of which path (the login form's Server
+ * Action, or a direct POST to /api/auth/callback/credentials) reached it.
+ */
+export function getClientIpFromRequest(request: Request): string {
+  return ipFromHeaders(request.headers);
 }
 
 async function prune(kind: "LOGIN" | "REGISTER") {

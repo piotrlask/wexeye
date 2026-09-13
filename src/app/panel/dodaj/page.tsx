@@ -95,7 +95,7 @@ async function ContentTab({ userId }: { userId: string }) {
 
 async function TeamTab({ userId }: { userId: string }) {
   const [user, commissions, adRevenue, tree] = await Promise.all([
-    prisma.user.findUnique({ where: { id: userId } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { referralCode: true } }),
     prisma.commission.aggregate({ where: { editorId: userId }, _sum: { amountCents: true } }),
     prisma.adRevenueShare.aggregate({ where: { userId }, _sum: { amountCents: true } }),
     getTeamTree(userId),

@@ -14,19 +14,52 @@ export async function sendFriendRequestAction(targetUserId: string): Promise<Fri
   const target = await prisma.user.findUnique({ where: { id: targetUserId }, select: { id: true } });
   if (!target) return { error: "Nie znaleziono użytkownika." };
 
-  const existing = await prisma.friendship.findFirst({
-    where: {
-      OR: [
-        { requesterId: session.user.id, addresseeId: targetUserId },
-        { requesterId: targetUserId, addresseeId: session.user.id },
-      ],
-    },
-  });
-  if (existing) return { error: "Zaproszenie już istnieje." };
+  const requesterId = session.user.id;
+  const addresseeId = targetUserId;
 
-  await prisma.friendship.create({
-    data: { requesterId: session.user.id, addresseeId: targetUserId, status: "PENDING" },
-  });
+  try {
+    // A relationship between two users is the same regardless of who sent
+    // the request (getFriendRelation/getAcceptedFriendIds both look in
+    // either direction), but the schema stores it as one directed row, so
+    // two concurrent requests in OPPOSITE directions (A invites B at the
+    // same moment B invites A) could each pass the "no existing row" check
+    // before either commits, producing two rows for what the app treats as
+    // one relationship — the @@unique([requesterId, addresseeId]) index
+    // only catches the same-direction case. Locking both users' rows in a
+    // fixed (sorted) order — same pattern as becomeEditorAction's sponsor
+    // lock — serializes any concurrent attempt touching this pair, in
+    // either direction, so the second transaction's existence check always
+    // sees the first one's committed row.
+    const [firstId, secondId] = [requesterId, addresseeId].sort();
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM User WHERE id IN (${firstId}, ${secondId}) ORDER BY id FOR UPDATE`;
+
+      const existing = await tx.friendship.findFirst({
+        where: {
+          OR: [
+            { requesterId, addresseeId },
+            { requesterId: addresseeId, addresseeId: requesterId },
+          ],
+        },
+      });
+      if (existing) throw new Error("ALREADY_EXISTS");
+
+      await tx.friendship.create({ data: { requesterId, addresseeId, status: "PENDING" } });
+    });
+  } catch (err) {
+    // Defense in depth, not the primary guard: the lock above already
+    // serializes same-pair attempts, but if a same-direction row ever slips
+    // through some other path, the DB's own @@unique index still rejects it
+    // with P2002 — treated the same as our own "already exists" check, not
+    // swallowed as a generic catch-all.
+    const isKnownDuplicate =
+      (err instanceof Error && err.message === "ALREADY_EXISTS") ||
+      (typeof err === "object" && err !== null && "code" in err && err.code === "P2002");
+    if (isKnownDuplicate) {
+      return { error: "Zaproszenie już istnieje." };
+    }
+    throw err;
+  }
 
   revalidatePath("/znajomi");
   revalidatePath(`/profil/${targetUserId}`);

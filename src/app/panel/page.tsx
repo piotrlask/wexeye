@@ -23,7 +23,19 @@ export default async function PanelPage({
   const { joinEditor } = await searchParams;
 
   const [user, subscription, purchases, friendCount, pendingReceivedCount] = await Promise.all([
-    prisma.user.findUnique({ where: { id: session.user.id } }),
+    prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        id: true,
+        name: true,
+        avatarUrl: true,
+        city: true,
+        gender: true,
+        age: true,
+        role: true,
+        referralCode: true,
+      },
+    }),
     prisma.subscription.findUnique({ where: { userId: session.user.id } }),
     prisma.purchase.findMany({
       where: { userId: session.user.id, status: "PAID" },
@@ -46,7 +58,10 @@ export default async function PanelPage({
   const friendShares = friendIds.length
     ? await prisma.share.findMany({
         where: { userId: { in: friendIds } },
-        include: { user: true, article: true },
+        include: {
+          user: { select: { name: true, avatarUrl: true } },
+          article: { select: { title: true } },
+        },
         orderBy: { createdAt: "desc" },
         take: 10,
       })

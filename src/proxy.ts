@@ -29,6 +29,14 @@ function buildCspHeader(nonce: string): string {
   ].join("; ");
 }
 
+// Renamed from middleware.ts (ETAP 11.3): Next.js 16 deprecated the
+// `middleware` file convention in favor of `proxy`, which — critically for
+// this stage — defaults to the Node.js runtime instead of Edge. auth()'s
+// `jwt` callback now does a Prisma lookup (passwordChangedAt, see
+// src/auth.ts) on every session read, and Prisma cannot run on the Edge
+// runtime at all. Pure rename + runtime change, zero logic touched — same
+// migration Next.js's own `middleware-to-proxy` codemod performs, and the
+// same warning this project's build output has shown since ETAP 7.16.
 export default auth((req) => {
   const { pathname } = req.nextUrl;
   const role = req.auth?.user?.role;

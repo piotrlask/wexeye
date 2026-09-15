@@ -179,3 +179,13 @@ export type AdPurchaseStatus = (typeof AD_PURCHASE_STATUSES)[number];
 
 export const ARTICLE_VIEW_COOKIE_PREFIX = "wxv_";
 export const ARTICLE_VIEW_DEDUPE_SECONDS = 60 * 60 * 4; // 4h
+
+// --- Notifications ------------------------------------------------------
+
+export const NOTIFICATION_TYPES = [
+  "FRIEND_REQUEST",
+  "FRIEND_ACCEPTED",
+  "ARTICLE_MODERATED",
+  "ARTICLE_SHARED",
+] as const;
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];

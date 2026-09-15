@@ -20,13 +20,19 @@ datasource db {
 // ReactionType: "OK" | "NOT_OK"
 // AdPurchaseStatus: "PENDING" | "PAID" | "ACTIVE" | "EXPIRED"
 // AdRevenueRole: "AUTHOR" | "ADMIN" | "LEVEL1" | "LEVEL2" | "LEVEL3" | "LEVEL4"
-// AuthAttemptKind: "LOGIN" | "REGISTER"
+// AuthAttemptKind: "LOGIN" | "REGISTER" | "PASSWORD_RESET"
+// NotificationType: "FRIEND_REQUEST" | "FRIEND_ACCEPTED" | "ARTICLE_MODERATED" | "ARTICLE_SHARED"
 // SQLite has no native enum support in Prisma, so these are validated in app code (see src/lib/constants.ts).
 
 model User {
   id               String    @id @default(cuid())
   email            String    @unique
   passwordHash     String
+  // Null until the password is ever explicitly changed (e.g. via password
+  // reset) — existing sessions are never invalidated retroactively just by
+  // this field existing. Once set, any JWT whose `iat` predates this
+  // timestamp is rejected on read (see src/auth.ts's `jwt` callback).
+  passwordChangedAt DateTime?
   name             String
   role             String    @default("READER")
   referralCode     String    @unique @default(cuid())
@@ -57,6 +63,9 @@ model User {
   adPurchasesMade     AdPurchase[]     @relation("AdAdvertiser")
   adPurchasesReceived AdPurchase[]     @relation("AdAuthor")
   adRevenueShares     AdRevenueShare[]
+
+  notifications Notification[]
+  passwordResetTokens PasswordResetToken[]
 }
 
 // A friend connection between two readers, Facebook-style: requester invites,
@@ -283,4 +292,41 @@ model AuthAttempt {
 
   @@index([kind, ip, createdAt])
   @@index([kind, email, createdAt])
+}
+
+// An in-app notification for a single user (friend requests, moderation
+// results, shares, etc). `readAt` is null until the user reads it —
+// presence of a timestamp (rather than a boolean) doubles as "when read"
+// without an extra column. `link` is an internal app-relative path only.
+model Notification {
+  id        String    @id @default(cuid())
+  user      User      @relation(fields: [userId], references: [id])
+  userId    String
+  type      String
+  title     String
+  message   String    @db.Text
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+}
+
+// A single-use, time-limited password reset link. Only the raw token (sent
+// in the email) ever leaves the server; the DB stores just its SHA-256 hash
+// (see src/lib/passwordReset.ts). `usedAt` is set both when a token is
+// actually consumed AND when it is superseded by a newer one for the same
+// user (see createPasswordResetToken) — either way, once set, the token can
+// never succeed again.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  user      User      @relation(fields: [userId], references: [id])
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  usedAt    DateTime?
+
+  @@index([userId])
 }

@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { ROLES } from "@/lib/constants";
 import { isAdmin } from "@/lib/access";
 import { isValidEmail } from "@/lib/email";
+import { createNotification } from "@/lib/notifications";
 
 async function requireAdmin() {
   const session = await auth();
@@ -69,16 +70,36 @@ export async function moderateArticleAction(
   // update below — this pre-check alone is enough to keep a bad/stale ID
   // (typed by hand, or a tampered direct call to this action) from
   // surfacing as an unhandled Prisma P2025 (500) instead of a normal result.
-  const article = await prisma.article.findUnique({ where: { id: articleId }, select: { id: true } });
+  const article = await prisma.article.findUnique({
+    where: { id: articleId },
+    select: { id: true, authorId: true, title: true },
+  });
   if (!article) {
     return { error: "Artykuł nie istnieje." };
   }
 
-  await prisma.article.update({
-    where: { id: articleId },
-    data: approve
-      ? { status: "PUBLISHED", publishedAt: new Date(), reviewNote: null }
-      : { status: "REJECTED", reviewNote: note ?? null },
+  await prisma.$transaction(async (tx) => {
+    await tx.article.update({
+      where: { id: articleId },
+      data: approve
+        ? { status: "PUBLISHED", publishedAt: new Date(), reviewNote: null }
+        : { status: "REJECTED", reviewNote: note ?? null },
+    });
+
+    await createNotification(
+      {
+        userId: article.authorId,
+        type: "ARTICLE_MODERATED",
+        title: approve ? "Artykuł zatwierdzony" : "Artykuł odrzucony",
+        message: approve
+          ? `Twój artykuł „${article.title}” został zatwierdzony i opublikowany.`
+          : `Twój artykuł „${article.title}” został odrzucony.`,
+        // REJECTED articles aren't publicly viewable (see /artykul/[id]/page.tsx),
+        // so only an approved article can link straight to its own page.
+        link: approve ? `/artykul/${articleId}` : "/panel/dodaj",
+      },
+      tx,
+    );
   });
 
   revalidatePath("/panel/admin");

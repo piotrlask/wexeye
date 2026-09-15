@@ -23,6 +23,13 @@ import { prisma } from "@/lib/prisma";
  * email during registration can't be used to lock out an existing account
  * (the existing "e-mail already exists" check is unaffected by this), so the
  * only real threat here is one source creating many accounts.
+ *
+ * Password reset requests are throttled per IP AND per email ALONE (not
+ * IP+email combined like login) — unlike a login attempt, a reset request
+ * costs the target an email, so the real threat is someone email-bombing one
+ * victim's inbox from many different IPs, which only a pure per-email limit
+ * catches. This can't be used to lock the real owner out of anything: a
+ * reset request never blocks login itself, only further reset emails.
  */
 
 const LOGIN_IP_WINDOW_MS = 15 * 60 * 1000;
@@ -34,8 +41,20 @@ const LOGIN_IP_EMAIL_LIMIT = 5;
 const REGISTER_IP_WINDOW_MS = 60 * 60 * 1000;
 const REGISTER_IP_LIMIT = 5;
 
+const PASSWORD_RESET_IP_WINDOW_MS = 60 * 60 * 1000;
+const PASSWORD_RESET_IP_LIMIT = 10;
+
+const PASSWORD_RESET_EMAIL_WINDOW_MS = 60 * 60 * 1000;
+const PASSWORD_RESET_EMAIL_LIMIT = 3;
+
 /** Longest of the windows actually in use, for opportunistic pruning. */
-const MAX_WINDOW_MS = Math.max(LOGIN_IP_WINDOW_MS, LOGIN_IP_EMAIL_WINDOW_MS, REGISTER_IP_WINDOW_MS);
+const MAX_WINDOW_MS = Math.max(
+  LOGIN_IP_WINDOW_MS,
+  LOGIN_IP_EMAIL_WINDOW_MS,
+  REGISTER_IP_WINDOW_MS,
+  PASSWORD_RESET_IP_WINDOW_MS,
+  PASSWORD_RESET_EMAIL_WINDOW_MS
+);
 
 /**
  * Best-effort client IP from the reverse proxy's `X-Forwarded-For` header.
@@ -75,7 +94,7 @@ export function getClientIpFromRequest(request: Request): string {
   return ipFromHeaders(request.headers);
 }
 
-async function prune(kind: "LOGIN" | "REGISTER") {
+async function prune(kind: "LOGIN" | "REGISTER" | "PASSWORD_RESET") {
   await prisma.authAttempt.deleteMany({
     where: { kind, createdAt: { lt: new Date(Date.now() - MAX_WINDOW_MS) } },
   });
@@ -113,4 +132,24 @@ export async function checkRegisterRateLimit(ip: string): Promise<boolean> {
 export async function recordRegisterAttempt(ip: string): Promise<void> {
   await prisma.authAttempt.create({ data: { kind: "REGISTER", ip } });
   await prune("REGISTER");
+}
+
+/** Returns true when the caller is still under both password-reset-request limits. */
+export async function checkPasswordResetRateLimit(ip: string, email: string): Promise<boolean> {
+  const now = Date.now();
+  const [ipCount, emailCount] = await Promise.all([
+    prisma.authAttempt.count({
+      where: { kind: "PASSWORD_RESET", ip, createdAt: { gt: new Date(now - PASSWORD_RESET_IP_WINDOW_MS) } },
+    }),
+    prisma.authAttempt.count({
+      where: { kind: "PASSWORD_RESET", email, createdAt: { gt: new Date(now - PASSWORD_RESET_EMAIL_WINDOW_MS) } },
+    }),
+  ]);
+  return ipCount < PASSWORD_RESET_IP_LIMIT && emailCount < PASSWORD_RESET_EMAIL_LIMIT;
+}
+
+/** Records one password-reset request attempt — regardless of whether the account exists, so the limit itself never leaks account existence (see nie-pamietam-hasla/actions.ts). */
+export async function recordPasswordResetAttempt(ip: string, email: string): Promise<void> {
+  await prisma.authAttempt.create({ data: { kind: "PASSWORD_RESET", ip, email } });
+  await prune("PASSWORD_RESET");
 }

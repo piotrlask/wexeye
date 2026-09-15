@@ -72,7 +72,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     jwt: async ({ token, user }) => {
       if (user) {
         token.role = (user as { role: string }).role;
+        return token;
       }
+
+      // Every subsequent read of this token (this callback runs on every
+      // session check for the JWT strategy, not just at sign-in) rejects it
+      // outright if the account's password was changed after the token was
+      // issued (`iat`) — a stale, pre-reset JWT can never pass this,
+      // regardless of how cryptographically valid its signature still is.
+      // Returning `null` is Auth.js's own documented mechanism for "no
+      // longer a valid session": every existing `!session`/`!req.auth`
+      // check throughout the app (middleware, Server Actions, pages) treats
+      // this exactly like being logged out, with no changes needed there.
+      if (!token.sub) return null;
+      const dbUser = await prisma.user.findUnique({
+        where: { id: token.sub },
+        select: { passwordChangedAt: true },
+      });
+      if (!dbUser) return null;
+      if (dbUser.passwordChangedAt && token.iat && dbUser.passwordChangedAt.getTime() / 1000 > token.iat) {
+        return null;
+      }
+
       return token;
     },
     session: async ({ session, token }) => {

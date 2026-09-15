@@ -16,9 +16,14 @@ const MAIN_LINKS = [
 export default async function NavBar() {
   const session = await auth();
   const user = session?.user;
-  const avatarUrl = user?.id
-    ? (await prisma.user.findUnique({ where: { id: user.id }, select: { avatarUrl: true } }))?.avatarUrl
-    : null;
+  const [avatarUrl, unreadNotificationCount] = user?.id
+    ? await Promise.all([
+        prisma.user
+          .findUnique({ where: { id: user.id }, select: { avatarUrl: true } })
+          .then((u) => u?.avatarUrl ?? null),
+        prisma.notification.count({ where: { userId: user.id, readAt: null } }),
+      ])
+    : [null, 0];
 
   return (
     <header className="border-b border-black/10 dark:border-white/10">
@@ -54,7 +59,7 @@ export default async function NavBar() {
                 Znajomi
               </Link>
               <Link href="/powiadomienia" className="hover:underline">
-                Notifications
+                Notifications{unreadNotificationCount > 0 ? ` (${unreadNotificationCount})` : ""}
               </Link>
             </>
           )}

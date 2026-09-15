@@ -6,6 +6,8 @@ import { auth } from "@/auth";
 import { consumeSubscriptionQuota } from "@/lib/access";
 import { distributeCommission } from "@/lib/commissions";
 import { prisma } from "@/lib/prisma";
+import { getAcceptedFriendIds } from "@/lib/friends";
+import { createNotifications } from "@/lib/notifications";
 import {
   SUB30_MONTHLY_COMMISSION_CAP,
   ARTICLE_VIEW_COOKIE_PREFIX,
@@ -145,13 +147,31 @@ export async function shareWithFriendsAction(articleId: string): Promise<ShareSt
     return { error: "Musisz być zalogowany." };
   }
 
-  const article = await prisma.article.findUnique({ where: { id: articleId }, select: { status: true } });
+  const article = await prisma.article.findUnique({
+    where: { id: articleId },
+    select: { status: true, title: true },
+  });
   if (!article || article.status !== "PUBLISHED") {
     return { error: "Artykuł nie jest dostępny." };
   }
 
-  await prisma.share.create({
-    data: { userId: session.user.id, articleId },
+  const friendIds = await getAcceptedFriendIds(session.user.id);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.share.create({
+      data: { userId: session.user.id!, articleId },
+    });
+
+    await createNotifications(
+      friendIds.map((friendId) => ({
+        userId: friendId,
+        type: "ARTICLE_SHARED",
+        title: "Znajomy udostępnił artykuł",
+        message: `${session.user.name ?? "Znajomy"} udostępnił(a) Ci artykuł „${article.title}”.`,
+        link: `/artykul/${articleId}`,
+      })),
+      tx,
+    );
   });
 
   revalidatePath(`/artykul/${articleId}`);

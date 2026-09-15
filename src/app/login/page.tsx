@@ -42,6 +42,9 @@ export default function LoginPage() {
           {pending ? "Logowanie..." : "Zaloguj się"}
         </button>
       </form>
+      <p className="mt-2 text-sm text-black/60 dark:text-white/60">
+        <Link href="/nie-pamietam-hasla" className="underline">Nie pamiętam hasła</Link>
+      </p>
       <p className="mt-4 text-sm text-black/60 dark:text-white/60">
         Nie masz konta? <Link href="/rejestracja" className="underline">Zarejestruj się</Link>
       </p>

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { createNotification } from "@/lib/notifications";
 
 export type FriendActionState = { error?: string; success?: boolean };
 
@@ -45,6 +46,17 @@ export async function sendFriendRequestAction(targetUserId: string): Promise<Fri
       if (existing) throw new Error("ALREADY_EXISTS");
 
       await tx.friendship.create({ data: { requesterId, addresseeId, status: "PENDING" } });
+
+      await createNotification(
+        {
+          userId: addresseeId,
+          type: "FRIEND_REQUEST",
+          title: "Nowe zaproszenie do znajomych",
+          message: `${session.user.name ?? "Użytkownik"} wysłał(a) Ci zaproszenie do znajomych.`,
+          link: "/znajomi",
+        },
+        tx,
+      );
     });
   } catch (err) {
     // Defense in depth, not the primary guard: the lock above already
@@ -82,9 +94,22 @@ export async function acceptFriendRequestAction(friendshipId: string): Promise<F
     return { error: "Nie można zaakceptować tego zaproszenia." };
   }
 
-  await prisma.friendship.update({
-    where: { id: friendshipId },
-    data: { status: "ACCEPTED", respondedAt: new Date() },
+  await prisma.$transaction(async (tx) => {
+    await tx.friendship.update({
+      where: { id: friendshipId },
+      data: { status: "ACCEPTED", respondedAt: new Date() },
+    });
+
+    await createNotification(
+      {
+        userId: friendship.requesterId,
+        type: "FRIEND_ACCEPTED",
+        title: "Zaproszenie zaakceptowane",
+        message: `${session.user.name ?? "Użytkownik"} zaakceptował(a) Twoje zaproszenie do znajomych.`,
+        link: "/znajomi",
+      },
+      tx,
+    );
   });
 
   revalidatePath("/znajomi");

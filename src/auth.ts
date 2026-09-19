@@ -53,7 +53,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) {
+        // A deleted (soft-deleted, ETAP 12.4) account must be as unlogin-able
+        // as a nonexistent one — treated identically here (same generic
+        // failure, same recordFailedLogin) so this path never reveals
+        // whether an email once belonged to a deleted account.
+        if (!user || user.deletedAt) {
           await recordFailedLogin(ip, emailKey);
           return null;
         }
@@ -87,9 +91,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (!token.sub) return null;
       const dbUser = await prisma.user.findUnique({
         where: { id: token.sub },
-        select: { passwordChangedAt: true },
+        select: { passwordChangedAt: true, deletedAt: true },
       });
       if (!dbUser) return null;
+      // A deleted account (ETAP 12.4, soft-delete via deletedAt) must lose
+      // access exactly like a nonexistent one — same `return null` used for
+      // "no longer valid session" everywhere else in this callback. The
+      // anonymization that sets deletedAt also bumps passwordChangedAt in
+      // the same update, so this check is actually redundant with the one
+      // below for any session that predates the deletion — but deletedAt is
+      // the deliberate, permanent source of truth (see schema.prisma), not
+      // an accident of timing, so it's checked explicitly and independently.
+      if (dbUser.deletedAt) return null;
       if (dbUser.passwordChangedAt && token.iat && dbUser.passwordChangedAt.getTime() / 1000 > token.iat) {
         return null;
       }

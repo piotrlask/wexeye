@@ -43,7 +43,9 @@ export default async function SzukajPage({
         take: 30,
       }),
       prisma.user.findMany({
-        where: { name: { contains: query } },
+        // Deleted (ETAP 12.4) accounts are all named identically ("Usunięty
+        // użytkownik") and must never surface as a searchable person.
+        where: { name: { contains: query }, deletedAt: null },
         select: { id: true, name: true, role: true },
         take: 20,
       }),

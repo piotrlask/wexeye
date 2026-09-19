@@ -33,6 +33,15 @@ model User {
   // this field existing. Once set, any JWT whose `iat` predates this
   // timestamp is rejected on read (see src/auth.ts's `jwt` callback).
   passwordChangedAt DateTime?
+  // Non-null once the account has been deleted (soft-delete + anonymize —
+  // see ETAP 12.4 / src/app/panel/actions.ts's deleteAccountAction). The row
+  // itself is never physically removed (Article/Comment/Purchase/etc. all
+  // have RESTRICT FKs to User, and financial/content history must survive),
+  // but every identifying field is scrubbed and every place that treats a
+  // user as "active" (login, search, friend suggestions, isAdmin/isReader/
+  // hasStaffAccess) must check this is null. This is the single source of
+  // truth for "deleted" — never inferred from the anonymized email pattern.
+  deletedAt        DateTime?
   name             String
   role             String    @default("READER")
   referralCode     String    @unique @default(cuid())

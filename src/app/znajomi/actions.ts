@@ -12,8 +12,13 @@ export async function sendFriendRequestAction(targetUserId: string): Promise<Fri
   if (!session?.user?.id) return { error: "Musisz być zalogowany." };
   if (session.user.id === targetUserId) return { error: "Nie możesz zaprosić samego siebie." };
 
-  const target = await prisma.user.findUnique({ where: { id: targetUserId }, select: { id: true } });
-  if (!target) return { error: "Nie znaleziono użytkownika." };
+  const target = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { id: true, deletedAt: true },
+  });
+  // A deleted (ETAP 12.4) account must be as un-inviteable as a nonexistent
+  // one — same generic error, no distinction leaked.
+  if (!target || target.deletedAt) return { error: "Nie znaleziono użytkownika." };
 
   const requesterId = session.user.id;
   const addresseeId = targetUserId;

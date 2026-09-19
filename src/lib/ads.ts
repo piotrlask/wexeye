@@ -30,7 +30,11 @@ export async function distributeAdRevenue(purchaseId: string) {
 
   shares.push({ userId: purchase.authorId, role: "AUTHOR", amountCents: pctOf(AD_REVENUE_SPLIT_PCT.AUTHOR) });
 
-  const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { id: true } });
+  // Excludes deleted accounts (ETAP 12.4) — role is deliberately left
+  // unchanged by anonymization (see schema.prisma's User.deletedAt comment),
+  // so without this a deleted admin would keep silently receiving a live
+  // revenue cut forever.
+  const admins = await prisma.user.findMany({ where: { role: "ADMIN", deletedAt: null }, select: { id: true } });
   if (admins.length > 0) {
     const adminTotal = pctOf(AD_REVENUE_SPLIT_PCT.ADMIN);
     const perAdmin = Math.round(adminTotal / admins.length);

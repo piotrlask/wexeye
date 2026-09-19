@@ -30,6 +30,24 @@ import { prisma } from "@/lib/prisma";
  * victim's inbox from many different IPs, which only a pure per-email limit
  * catches. This can't be used to lock the real owner out of anything: a
  * reset request never blocks login itself, only further reset emails.
+ *
+ * Changing password from an active session is throttled per email ALONE too
+ * (no IP dimension needed): this action always requires an existing valid
+ * session, so the threat isn't an anonymous attacker — it's whoever holds
+ * that session (e.g. a hijacked/shared device) trying to brute-force the
+ * account's CURRENT password via bcrypt.compare. Keying purely by the
+ * account's own email stops that regardless of which IP the guesses come
+ * from, and — same reasoning as login — can't be used by a third party to
+ * lock the real owner out, since it only throttles further attempts on
+ * their own account, never anyone else's ability to log in.
+ *
+ * Deleting the account is throttled the same way as changing its password —
+ * per email only, only on a failed current-password check — for the exact
+ * same reason: it too requires an existing session, so the threat is a
+ * hijacked/shared session brute-forcing the CURRENT password, not anonymous
+ * multi-IP abuse. A separate, deliberately smaller limit than
+ * CHANGE_PASSWORD: this is the more consequential of the two operations, so
+ * fewer guesses are allowed before the account-holder has to wait.
  */
 
 const LOGIN_IP_WINDOW_MS = 15 * 60 * 1000;
@@ -47,13 +65,21 @@ const PASSWORD_RESET_IP_LIMIT = 10;
 const PASSWORD_RESET_EMAIL_WINDOW_MS = 60 * 60 * 1000;
 const PASSWORD_RESET_EMAIL_LIMIT = 3;
 
+const CHANGE_PASSWORD_WINDOW_MS = 15 * 60 * 1000;
+const CHANGE_PASSWORD_LIMIT = 5;
+
+const DELETE_ACCOUNT_WINDOW_MS = 15 * 60 * 1000;
+const DELETE_ACCOUNT_LIMIT = 3;
+
 /** Longest of the windows actually in use, for opportunistic pruning. */
 const MAX_WINDOW_MS = Math.max(
   LOGIN_IP_WINDOW_MS,
   LOGIN_IP_EMAIL_WINDOW_MS,
   REGISTER_IP_WINDOW_MS,
   PASSWORD_RESET_IP_WINDOW_MS,
-  PASSWORD_RESET_EMAIL_WINDOW_MS
+  PASSWORD_RESET_EMAIL_WINDOW_MS,
+  CHANGE_PASSWORD_WINDOW_MS,
+  DELETE_ACCOUNT_WINDOW_MS
 );
 
 /**
@@ -94,7 +120,7 @@ export function getClientIpFromRequest(request: Request): string {
   return ipFromHeaders(request.headers);
 }
 
-async function prune(kind: "LOGIN" | "REGISTER" | "PASSWORD_RESET") {
+async function prune(kind: "LOGIN" | "REGISTER" | "PASSWORD_RESET" | "CHANGE_PASSWORD" | "DELETE_ACCOUNT") {
   await prisma.authAttempt.deleteMany({
     where: { kind, createdAt: { lt: new Date(Date.now() - MAX_WINDOW_MS) } },
   });
@@ -152,4 +178,32 @@ export async function checkPasswordResetRateLimit(ip: string, email: string): Pr
 export async function recordPasswordResetAttempt(ip: string, email: string): Promise<void> {
   await prisma.authAttempt.create({ data: { kind: "PASSWORD_RESET", ip, email } });
   await prune("PASSWORD_RESET");
+}
+
+/** Returns true when the caller is still under the change-password limit (keyed by the account's own email — see the module doc comment for why). */
+export async function checkChangePasswordRateLimit(email: string): Promise<boolean> {
+  const count = await prisma.authAttempt.count({
+    where: { kind: "CHANGE_PASSWORD", email, createdAt: { gt: new Date(Date.now() - CHANGE_PASSWORD_WINDOW_MS) } },
+  });
+  return count < CHANGE_PASSWORD_LIMIT;
+}
+
+/** Records one failed change-password attempt. Call only after current-password verification actually fails — mirrors recordFailedLogin, not recordPasswordResetAttempt, since there's no account-existence ambiguity to hide here (the caller is already authenticated). `ip` is still required by the AuthAttempt schema even though the rate-limit check itself only keys on email. */
+export async function recordFailedChangePasswordAttempt(ip: string, email: string): Promise<void> {
+  await prisma.authAttempt.create({ data: { kind: "CHANGE_PASSWORD", ip, email } });
+  await prune("CHANGE_PASSWORD");
+}
+
+/** Returns true when the caller is still under the delete-account limit (keyed by the account's own email — see the module doc comment for why). */
+export async function checkDeleteAccountRateLimit(email: string): Promise<boolean> {
+  const count = await prisma.authAttempt.count({
+    where: { kind: "DELETE_ACCOUNT", email, createdAt: { gt: new Date(Date.now() - DELETE_ACCOUNT_WINDOW_MS) } },
+  });
+  return count < DELETE_ACCOUNT_LIMIT;
+}
+
+/** Records one failed delete-account attempt. Call only after current-password verification actually fails. */
+export async function recordFailedDeleteAccountAttempt(ip: string, email: string): Promise<void> {
+  await prisma.authAttempt.create({ data: { kind: "DELETE_ACCOUNT", ip, email } });
+  await prune("DELETE_ACCOUNT");
 }

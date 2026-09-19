@@ -13,9 +13,14 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
   const { id } = await params;
   const profileUser = await prisma.user.findUnique({
     where: { id },
-    select: { id: true, name: true, avatarUrl: true, role: true, city: true, gender: true, age: true },
+    select: { id: true, name: true, avatarUrl: true, role: true, city: true, gender: true, age: true, deletedAt: true },
   });
-  if (!profileUser) notFound();
+  // A deleted (ETAP 12.4) account's profile page is treated exactly like a
+  // nonexistent one — never renders the anonymized data, never confirms the
+  // account existed. Articles/comments by this author are unaffected (they
+  // render through their own pages, not this one) and still show "Usunięty
+  // użytkownik" via the live author.name read there.
+  if (!profileUser || profileUser.deletedAt) notFound();
 
   const session = await auth();
   const viewerId = session?.user?.id;

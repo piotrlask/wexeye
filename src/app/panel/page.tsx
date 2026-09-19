@@ -5,6 +5,8 @@ import { PRICING } from "@/lib/constants";
 import BecomeEditorForm from "./BecomeEditorForm";
 import CheckoutButtons from "@/components/CheckoutButtons";
 import ProfileForm from "./ProfileForm";
+import ChangePasswordForm from "./ChangePasswordForm";
+import DeleteAccountForm from "./DeleteAccountForm";
 import { getAcceptedFriendIds } from "@/lib/friends";
 import Avatar from "@/components/Avatar";
 
@@ -88,6 +90,11 @@ export default async function PanelPage({
             )}
           </Link>
         </p>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="mb-3 text-lg font-semibold">Zmiana hasła</h2>
+        <ChangePasswordForm />
       </section>
 
       {friendShares.length > 0 && (
@@ -180,6 +187,12 @@ export default async function PanelPage({
             Twój kod polecający: <code className="rounded bg-black/5 px-1.5 py-0.5 dark:bg-white/10">{user.referralCode}</code>
           </p>
         )}
+      </section>
+
+      <section className="mt-10">
+        <h2 className="mb-3 text-lg font-semibold">Ustawienia konta</h2>
+        <h3 className="mb-3 text-base font-medium">Usuń konto</h3>
+        <DeleteAccountForm />
       </section>
     </div>
   );

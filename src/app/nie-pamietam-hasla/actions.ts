@@ -59,7 +59,7 @@ export async function requestPasswordResetAction(
   }
   await recordPasswordResetAttempt(ip, email);
 
-  const user = await prisma.user.findUnique({ where: { email }, select: { id: true, name: true } });
+  const user = await prisma.user.findUnique({ where: { email }, select: { id: true, name: true, deletedAt: true } });
 
   // See RESET_RESPONSE_MIN_MS above: this whole block's real work only runs
   // for an existing account, so its duration is floored to run alongside a
@@ -68,7 +68,9 @@ export async function requestPasswordResetAction(
   // something.
   await Promise.all([
     (async () => {
-      if (!user) return;
+      // A deleted (ETAP 12.4) account is treated exactly like a nonexistent
+      // one: no token, no email — and the same neutral response/timing.
+      if (!user || user.deletedAt) return;
 
       const rawToken = await createPasswordResetToken(user.id);
       const baseUrl = await getBaseUrl();

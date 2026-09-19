@@ -49,9 +49,9 @@ export async function validatePasswordResetToken(rawToken: string): Promise<Vali
   const tokenHash = hashToken(rawToken);
   const record = await prisma.passwordResetToken.findUnique({
     where: { tokenHash },
-    select: { userId: true, usedAt: true, expiresAt: true, user: { select: { id: true } } },
+    select: { userId: true, usedAt: true, expiresAt: true, user: { select: { id: true, deletedAt: true } } },
   });
-  if (!record || record.usedAt || record.expiresAt < new Date() || !record.user) {
+  if (!record || record.usedAt || record.expiresAt < new Date() || !record.user || record.user.deletedAt) {
     return null;
   }
   return { userId: record.userId };
@@ -89,8 +89,10 @@ export async function resetPasswordWithToken(rawToken: string, newPasswordHash: 
       });
       if (!record) return "invalid";
 
-      const user = await tx.user.findUnique({ where: { id: record.userId }, select: { id: true } });
-      if (!user) return "invalid";
+      // A deleted (ETAP 12.4) account can never be revived/modified through a
+      // reset token, even a stale one issued before deletion.
+      const user = await tx.user.findUnique({ where: { id: record.userId }, select: { id: true, deletedAt: true } });
+      if (!user || user.deletedAt) return "invalid";
 
       // passwordChangedAt in the SAME write as passwordHash — an active JWT
       // issued before this moment is rejected on its next read (see

@@ -36,7 +36,8 @@ export default async function ZnajomiPage({
     }),
     query
       ? prisma.user.findMany({
-          where: { name: { contains: query }, id: { not: userId } },
+          // Deleted (ETAP 12.4) accounts must never be proposed as a new friend.
+          where: { name: { contains: query }, id: { not: userId }, deletedAt: null },
           select: personSelect,
           take: 20,
         })

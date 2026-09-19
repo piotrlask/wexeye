@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isReader } from "@/lib/access";
+import { CONTACT_EMAILS } from "@/lib/legal";
 import { MAX_DIRECT_REFERRALS, GENDERS } from "@/lib/constants";
 import {
   getClientIp,
@@ -394,7 +395,7 @@ export async function deleteAccountAction(
     }
     if (err instanceof Error && err.message === "ACTIVE_SUBSCRIPTION") {
       return {
-        error: "Masz aktywną subskrypcję. Skontaktuj się z obsługą, aby ją anulować przed usunięciem konta.",
+        error: `Masz aktywną subskrypcję. Napisz na ${CONTACT_EMAILS.general} (lub użyj strony /kontakt), aby ją anulować przed usunięciem konta.`,
       };
     }
     if (err instanceof Error && err.message === "ALREADY_DELETED") {

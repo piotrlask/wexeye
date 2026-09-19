@@ -7,6 +7,9 @@ import CreateEditorForm from "./CreateEditorForm";
 import PaymentForm from "./PaymentForm";
 import ModerationItem from "./ModerationItem";
 import PaymentRow from "./PaymentRow";
+import TakedownRow from "./TakedownRow";
+import QuarantineRepairForm from "./QuarantineRepairForm";
+import { getQuarantineOverview, type QuarantineSeverity } from "@/lib/mediaQuarantine";
 import TeamTreeView, { TeamTreeLegend } from "@/components/TeamTreeView";
 
 const ROLE_LABELS: Record<string, string> = { ADMIN: "Administrator", EDITOR: "Redaktor" };
@@ -59,8 +62,79 @@ export default async function AdminPage({
   );
 }
 
+const SEVERITY_LABEL: Record<QuarantineSeverity, string> = {
+  OK: "OK",
+  WARNING: "OSTRZEŻENIE",
+  ERROR: "BŁĄD",
+  CRITICAL: "KRYTYCZNE",
+};
+const SEVERITY_BOX: Record<QuarantineSeverity, string> = {
+  OK: "border-green-600/50 bg-green-600/5",
+  WARNING: "border-amber-600/60 bg-amber-500/10",
+  ERROR: "border-red-600 bg-red-600/10",
+  CRITICAL: "border-red-700 bg-red-600/15",
+};
+
+/**
+ * "Kwarantanna mediów" (ETAP 13.3C.2): live preflight of the quarantine
+ * directory + a check whether media of taken-down articles may still be public.
+ * Admin-only (the whole page returns null for non-admins). Shows OK / WARNING /
+ * ERROR / CRITICAL and never a filesystem path.
+ */
+async function QuarantineSection() {
+  const o = await getQuarantineOverview();
+  const dirLabel = o.health.source === "env" ? "QUARANTINE_DIR ustawiony" : "lokalny katalog domyślny (brak QUARANTINE_DIR)";
+  return (
+    <section className={`rounded-lg border-2 p-4 ${SEVERITY_BOX[o.severity]}`}>
+      <h2 className="mb-2 flex flex-wrap items-center gap-3 text-lg font-semibold">
+        Kwarantanna mediów
+        <span
+          className={`rounded px-2 py-0.5 text-sm ${
+            o.severity === "OK" ? "bg-green-700 text-white" : o.severity === "WARNING" ? "bg-amber-600 text-white" : "bg-red-700 text-white"
+          }`}
+        >
+          {SEVERITY_LABEL[o.severity]}
+        </span>
+      </h2>
+      {o.alerts
+        .filter((a) => a.startsWith("UWAGA") || o.severity === "ERROR" || o.severity === "CRITICAL")
+        .slice(0, 6)
+        .map((a) => (
+          <p key={a} className="mb-1 text-sm font-semibold text-red-700 dark:text-red-400">
+            {a}
+          </p>
+        ))}
+      <p className="text-sm">
+        Test kwarantanny: <strong>{SEVERITY_LABEL[o.health.status]}</strong> — {o.health.message}
+      </p>
+      <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+        Konfiguracja: {dirLabel}. Media zdjętych artykułów: {o.takenDownMedia} (bez kwarantanny: {o.unquarantined}). Kopie publiczne
+        wykryte: {o.publicCopies}.
+      </p>
+      {o.alerts
+        .filter((a) => !(a.startsWith("UWAGA") || o.severity === "ERROR" || o.severity === "CRITICAL"))
+        .map((a) => (
+          <p key={a} className="mt-1 text-sm text-black/70 dark:text-white/70">
+            {a}
+          </p>
+        ))}
+      <QuarantineRepairForm />
+    </section>
+  );
+}
+
 async function ManagementTab() {
-  const [team, pendingArticles, payments, commissionTotals, revenue, adRevenueTotals, activeAds, adRevenueTotal] =
+  const [
+    team,
+    pendingArticles,
+    payments,
+    commissionTotals,
+    revenue,
+    adRevenueTotals,
+    activeAds,
+    adRevenueTotal,
+    takenDownArticles,
+  ] =
     await Promise.all([
       prisma.user.findMany({
         orderBy: { createdAt: "asc" },
@@ -84,6 +158,20 @@ async function ManagementTab() {
         orderBy: { startsAt: "asc" },
       }),
       prisma.adPurchase.aggregate({ where: { status: { in: ["PAID", "ACTIVE", "EXPIRED"] } }, _sum: { amountCents: true } }),
+      // Emergency takedowns (ETAP 13.3C). Admin-only page, so the reason may be shown here.
+      prisma.article.findMany({
+        where: { status: "TAKEN_DOWN" },
+        select: {
+          id: true,
+          title: true,
+          takedownAt: true,
+          takedownReason: true,
+          author: { select: { name: true } },
+          media: { select: { quarantinedAt: true } },
+        },
+        orderBy: { takedownAt: "desc" },
+        take: 20,
+      }),
     ]);
 
   const commissionByEditorId = new Map(commissionTotals.map((c) => [c.editorId, c._sum.amountCents ?? 0]));
@@ -94,6 +182,8 @@ async function ManagementTab() {
 
   return (
     <div className="flex flex-col gap-12">
+      <QuarantineSection />
+
       <section>
         <h2 className="mb-4 text-lg font-semibold">Zespół redakcyjny</h2>
         <CreateEditorForm />
@@ -170,6 +260,31 @@ async function ManagementTab() {
                 title={a.title}
                 author={a.author.name}
                 category={a.category}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section>
+        <h2 className="mb-4 text-lg font-semibold">Treści ukryte awaryjnie</h2>
+        <p className="mb-3 text-sm text-black/60 dark:text-white/60">
+          Artykuł ukrywasz przyciskiem „Ukryj awaryjnie” na jego stronie publicznej (komentarze — przy komentarzu).
+          Ukryte treści nie są kasowane.
+        </p>
+        {takenDownArticles.length === 0 ? (
+          <p className="text-sm text-black/60 dark:text-white/60">Brak ukrytych treści.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {takenDownArticles.map((a) => (
+              <TakedownRow
+                key={a.id}
+                articleId={a.id}
+                title={a.title}
+                author={a.author.name}
+                takedownAt={a.takedownAt?.toLocaleString("pl-PL") ?? "—"}
+                reason={a.takedownReason ?? "—"}
+                unquarantinedMedia={a.media.filter((m) => !m.quarantinedAt).length}
               />
             ))}
           </ul>

@@ -11,6 +11,7 @@ const STATUS_LABELS: Record<string, string> = {
   PENDING: "Czeka na zatwierdzenie",
   PUBLISHED: "Opublikowany",
   REJECTED: "Odrzucony",
+  TAKEN_DOWN: "Ograniczony przez administrację",
 };
 
 const TABS = [

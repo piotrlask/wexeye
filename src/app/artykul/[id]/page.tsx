@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { hasArticleAccess, hasStaffAccess } from "@/lib/access";
+import { hasArticleAccess, hasStaffAccess, isAdmin } from "@/lib/access";
 import {
   POST_TYPE_LABELS,
   SOURCE_TYPE_LABELS,
@@ -19,6 +19,7 @@ import ShareButton from "./ShareButton";
 import Avatar from "@/components/Avatar";
 import AdSlots from "@/components/AdSlots";
 import ViewTracker from "./ViewTracker";
+import AdminTakedown from "./AdminTakedown";
 
 export default async function ArticlePage({
   params,
@@ -31,7 +32,7 @@ export default async function ArticlePage({
     include: {
       author: { select: { name: true } },
       media: true,
-      _count: { select: { witnesses: true, comments: true } },
+      _count: { select: { witnesses: true, comments: { where: { hiddenAt: null } } } },
     },
   });
 
@@ -43,6 +44,9 @@ export default async function ArticlePage({
   const userId = session?.user?.id;
   const isStaff = await hasStaffAccess(userId);
   const hasAccess = isStaff || (await hasArticleAccess(userId, article.id));
+  // Fresh DB check (not the JWT role). Only decides whether the emergency
+  // takedown controls are rendered; the server actions re-check on their own.
+  const viewerIsAdmin = await isAdmin(userId);
 
   const [subscription, myWitnessMark, myReaction, okCount, notOkCount, comments] = await Promise.all([
     userId ? prisma.subscription.findUnique({ where: { userId } }) : null,
@@ -55,7 +59,7 @@ export default async function ArticlePage({
     prisma.reaction.count({ where: { articleId: article.id, type: "OK" } }),
     prisma.reaction.count({ where: { articleId: article.id, type: "NOT_OK" } }),
     prisma.comment.findMany({
-      where: { articleId: article.id },
+      where: { articleId: article.id, hiddenAt: null },
       include: { author: { select: { name: true, avatarUrl: true } } },
       orderBy: { createdAt: "desc" },
     }),
@@ -232,6 +236,8 @@ export default async function ArticlePage({
       )}
       <AdSlots authorId={article.authorId} articleId={article.id} loggedIn={Boolean(userId)} />
 
+      {viewerIsAdmin && <AdminTakedown kind="article" targetId={article.id} />}
+
       <section className="mt-10 border-t border-black/10 pt-6 dark:border-white/10">
         <h2 className="mb-4 text-lg font-semibold">
           Komentarze ({article._count.comments})
@@ -263,6 +269,7 @@ export default async function ArticlePage({
                   <p className="mt-1 whitespace-pre-wrap text-sm text-black/80 dark:text-white/80">
                     {c.body}
                   </p>
+                  {viewerIsAdmin && <AdminTakedown kind="comment" targetId={c.id} />}
                 </div>
               </li>
             ))}

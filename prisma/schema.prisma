@@ -143,6 +143,16 @@ model Article {
   longitude      Float?
   locationHidden Boolean @default(false)
 
+  // Emergency takedown (ETAP 13.3C). status = "TAKEN_DOWN" is the source of
+  // truth for "not public"; these fields only record why/when/who and what the
+  // status was before, so a later restore/appeal flow has what it needs. A
+  // takedown never deletes the row, its Media rows, purchases or commissions.
+  // takedownById is a plain user id (no FK): users are only ever soft-deleted.
+  takedownAt             DateTime?
+  takedownReason         String?   @db.Text
+  takedownById           String?
+  takedownPreviousStatus String?
+
   // WHEN (of the event itself, as opposed to createdAt/publishedAt)
   eventAt DateTime?
 
@@ -164,6 +174,12 @@ model Comment {
   article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
   articleId String
   createdAt DateTime @default(now())
+
+  // Emergency hide (ETAP 13.3C): a non-null hiddenAt removes the comment from
+  // every public view; the row, its author and body are kept for review.
+  hiddenAt     DateTime?
+  hiddenReason String?   @db.Text
+  hiddenById   String?
 }
 
 // "I witnessed this" mark — one per user per post. Count of rows = witness count.
@@ -185,6 +201,11 @@ model Media {
   article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
   articleId String
   createdAt DateTime @default(now())
+
+  // Set when the file behind `url` was moved out of public/uploads into the
+  // private quarantine directory by an emergency takedown (ETAP 13.3C).
+  // `url` itself is never rewritten, so the file can be restored later.
+  quarantinedAt DateTime?
 }
 
 // Manual bookkeeping entries created by admin (e.g. flat payouts, expenses) — unrelated to the automatic commission engine below.

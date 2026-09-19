@@ -1,7 +1,14 @@
 export const ROLES = ["READER", "EDITOR", "ADMIN"] as const;
 export type Role = (typeof ROLES)[number];
 
-export const ARTICLE_STATUSES = ["DRAFT", "PENDING", "PUBLISHED", "REJECTED"] as const;
+// Media quarantine (ETAP 13.3C.2): bounded automatic retry of transient
+// filesystem errors, and the maximum number of media checked per sweeper run.
+export const QUARANTINE_RETRY_ATTEMPTS = 3;
+export const QUARANTINE_BATCH_SIZE = 50;
+
+// "TAKEN_DOWN" (ETAP 13.3C) = hidden from every public view by an admin's
+// emergency takedown; the row and all its history are kept.
+export const ARTICLE_STATUSES = ["DRAFT", "PENDING", "PUBLISHED", "REJECTED", "TAKEN_DOWN"] as const;
 export type ArticleStatus = (typeof ARTICLE_STATUSES)[number];
 
 export const MEDIA_TYPES = ["PHOTO", "VIDEO", "REEL"] as const;

@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getAccessibleArticleIds, previewBody } from "@/lib/access";
 import PostCard from "@/components/PostCard";
-import type { FeedPost } from "@/lib/feed";
+import { toFeedPost, type FeedPost } from "@/lib/feed";
 
 export default async function SzukajPage({
   searchParams,
@@ -30,14 +30,18 @@ export default async function SzukajPage({
             { title: { contains: query } },
             { body: { contains: query } },
             { hashtags: { contains: query } },
-            { city: { contains: query } },
-            { country: { contains: query } },
+            // The place fields are only searchable for articles whose author
+            // did NOT hide the location (ETAP 13.3C): otherwise searching a
+            // city name would reveal which hidden-location articles were
+            // written there, even though the card never shows it.
+            { locationHidden: false, city: { contains: query } },
+            { locationHidden: false, country: { contains: query } },
           ],
         },
         include: {
           author: { select: { name: true } },
           media: true,
-          _count: { select: { witnesses: true, comments: true } },
+          _count: { select: { witnesses: true, comments: { where: { hiddenAt: null } } } },
         },
         orderBy: { publishedAt: "desc" },
         take: 30,
@@ -55,12 +59,7 @@ export default async function SzukajPage({
     // gets its free preview sent to the client, never the full body.
     const accessibleIds = await getAccessibleArticleIds(session?.user?.id, articles.map((a) => a.id));
 
-    posts = articles.map((a) => ({
-      ...a,
-      body: accessibleIds.has(a.id) ? a.body : previewBody(a.body),
-      witnessCount: a._count.witnesses,
-      commentCount: a._count.comments,
-    }));
+    posts = articles.map((a) => toFeedPost(a, accessibleIds.has(a.id) ? a.body : previewBody(a.body)));
     people = users;
   }
 

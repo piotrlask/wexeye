@@ -62,6 +62,9 @@ admin-setup*
 /public/uploads/*
 !/public/uploads/.gitkeep
 
+# media quarantined by an emergency takedown (ETAP 13.3C) — evidence, never committed
+/private/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { activateAdPurchase } from "@/lib/ads";
+import { CONTACT_EMAILS } from "@/lib/legal";
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const ALLOWED_TYPES: Record<string, "PHOTO" | "VIDEO"> = {
@@ -79,7 +80,7 @@ export async function uploadAdCreativeAction(
   const result = await activateAdPurchase(purchaseId, mediaType, `/uploads/${filename}`, linkUrl);
   if (result === "slot-full") {
     return {
-      error: "Wszystkie miejsca reklamowe u tego autora są już zajęte. Skontaktuj się z obsługą w sprawie zwrotu.",
+      error: `Wszystkie miejsca reklamowe u tego autora są już zajęte. Napisz na ${CONTACT_EMAILS.general} (lub użyj strony /kontakt) w sprawie zwrotu.`,
     };
   }
 

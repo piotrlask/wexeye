@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -11,7 +12,9 @@ export default async function ZnajomiPage({
 }) {
   const session = await auth();
   const userId = session?.user?.id;
-  if (!userId) return null;
+  // ETAP 13.3C.4F.1 (A3/18): same as /powiadomienia — a fixed literal path,
+  // nothing here for getSafeRedirectPath to validate.
+  if (!userId) redirect("/login?next=%2Fznajomi");
 
   const { q } = await searchParams;
   const query = (q ?? "").trim();

@@ -6,6 +6,14 @@ import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
 import { getClientIp, checkRegisterRateLimit, recordRegisterAttempt } from "@/lib/rateLimit";
 import { isValidEmail } from "@/lib/email";
+import { fitsVarchar, VARCHAR_191_MAX } from "@/lib/validation";
+
+// Same neutral copy used below for "an account already exists" — extracted
+// so the P2002 race-condition branch (two concurrent registrations for the
+// same email) shows the exact same message as the ordinary pre-check, never
+// revealing which of the two actually happened.
+const ACCOUNT_MAY_BE_CREATED_MESSAGE =
+  "Jeśli podany adres może zostać użyty do rejestracji, konto zostanie utworzone.";
 
 export type RegisterState = { error?: string };
 
@@ -30,8 +38,14 @@ export async function registerAction(
   if (!name || !email || !password) {
     return { error: "Imię, e-mail i hasło są wymagane." };
   }
+  if (!fitsVarchar(name)) {
+    return { error: `Imię i nazwisko jest za długie (maksymalnie ${VARCHAR_191_MAX} znaków).` };
+  }
   if (!isValidEmail(email)) {
     return { error: "Podaj prawidłowy adres e-mail." };
+  }
+  if (!fitsVarchar(email)) {
+    return { error: `Adres e-mail jest za długi (maksymalnie ${VARCHAR_191_MAX} znaków).` };
   }
   if (password.length < 10) {
     return { error: "Hasło musi mieć co najmniej 10 znaków." };
@@ -47,15 +61,29 @@ export async function registerAction(
   // no longer say outright which case occurred.
   const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
   if (existing) {
-    return { error: "Jeśli podany adres może zostać użyty do rejestracji, konto zostanie utworzone." };
+    return { error: ACCOUNT_MAY_BE_CREATED_MESSAGE };
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
   // Self-registration always creates a READER account. Becoming an editor is
   // a separate, free upgrade offered from the reader's own account panel.
-  await prisma.user.create({
-    data: { name, email, passwordHash, role: "READER" },
-  });
+  try {
+    await prisma.user.create({
+      data: { name, email, passwordHash, role: "READER" },
+    });
+  } catch (err) {
+    // ETAP 13.3C.4F.1: the pre-check above has a race window — two concurrent
+    // registrations for the same (not-yet-existing) email can both pass it
+    // and both reach this create, and the DB's own @@unique(email) index is
+    // the actual guard (P2002 on the loser). Same neutral message as the
+    // ordinary pre-check above, not a distinct "account already exists"
+    // error, so this race can't be used to narrow down timing-based
+    // enumeration either.
+    if (typeof err === "object" && err !== null && "code" in err && err.code === "P2002") {
+      return { error: ACCOUNT_MAY_BE_CREATED_MESSAGE };
+    }
+    throw err;
+  }
 
   try {
     await signIn("credentials", { email, password, redirectTo: "/panel" });

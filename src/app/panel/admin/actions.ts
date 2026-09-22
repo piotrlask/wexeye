@@ -18,6 +18,7 @@ import {
   type QuarantineSeverity,
 } from "@/lib/mediaQuarantine";
 import { QUARANTINE_BATCH_SIZE } from "@/lib/constants";
+import { fitsVarchar, VARCHAR_191_MAX } from "@/lib/validation";
 
 async function requireAdmin() {
   const session = await auth();
@@ -40,6 +41,11 @@ export type TakedownState = { error?: string; success?: boolean; message?: strin
 
 const TAKEDOWN_REASON_MIN = 3;
 const TAKEDOWN_REASON_MAX = 1000;
+
+// ETAP 13.3C.4F.1 — same order of magnitude as TAKEDOWN_REASON_MAX; a
+// moderator's note is optional (unlike a takedown reason), so there is no
+// minimum length.
+const REVIEW_NOTE_MAX = 1000;
 
 /**
  * Fresh DB check of ADMIN (never the JWT role — see requireAdmin above), but
@@ -88,8 +94,14 @@ export async function createEditorAction(
   if (!name || !email || !password) {
     return { error: "Imię, e-mail i hasło są wymagane." };
   }
+  if (!fitsVarchar(name)) {
+    return { error: `Imię i nazwisko jest za długie (maksymalnie ${VARCHAR_191_MAX} znaków).` };
+  }
   if (!isValidEmail(email)) {
     return { error: "Podaj prawidłowy adres e-mail." };
+  }
+  if (!fitsVarchar(email)) {
+    return { error: `Adres e-mail jest za długi (maksymalnie ${VARCHAR_191_MAX} znaków).` };
   }
   if (password.length < 10) {
     return { error: "Hasło musi mieć co najmniej 10 znaków." };
@@ -110,12 +122,31 @@ export async function createEditorAction(
   return { success: true };
 }
 
+/**
+ * ADMIN-only approve/reject of a PENDING submission.
+ *
+ * ETAP 13.3C.4F.1: moderation only ever applies to a PENDING article — never
+ * re-approves/re-rejects an already PUBLISHED or REJECTED one, and (same
+ * guarantee as before, now just a special case of the same check) never
+ * touches a TAKEN_DOWN one. The pre-check below is a fast, friendly message
+ * for the common case; the actual guarantee is the atomic
+ * `updateMany({ where: { id, status: "PENDING" } })` further down, which is
+ * what a concurrent second moderation call (or a concurrent emergency
+ * takedown) actually races against.
+ */
 export async function moderateArticleAction(
   articleId: string,
   approve: boolean,
   note?: string
 ): Promise<FormState> {
   await requireAdmin();
+
+  // Optional even on reject; trimmed and length-checked before anything else
+  // so a bad note never gets as far as a DB write.
+  const trimmedNote = typeof note === "string" ? note.trim() : "";
+  if (trimmedNote.length > REVIEW_NOTE_MAX) {
+    return { error: `Notatka jest za długa (maksymalnie ${REVIEW_NOTE_MAX} znaków).` };
+  }
 
   // Neither this app nor any admin action ever deletes an Article, so there
   // is no real window for the row to disappear between this check and the
@@ -129,45 +160,51 @@ export async function moderateArticleAction(
   if (!article) {
     return { error: "Artykuł nie istnieje." };
   }
-  // ETAP 13.3C: a takedown must not be silently undone (and its reviewNote
-  // semantics must not be mixed in) by the approve/reject flow. There is no
-  // restore flow yet; a taken-down article stays taken down.
-  if (article.status === "TAKEN_DOWN") {
-    return { error: "Artykuł jest ukryty awaryjnie — nie można go zatwierdzić ani odrzucić." };
+  if (article.status !== "PENDING") {
+    return { error: "Ten artykuł nie oczekuje już na moderację (mógł zostać już przetworzony)." };
   }
 
   const moderated = await prisma.$transaction(async (tx) => {
-    // Conditional on "not taken down": an emergency takedown committed between
-    // the pre-check above and this write must win, never be overwritten.
+    // Conditional on "still PENDING": a second moderation call (double
+    // submit) or a concurrent emergency takedown committed between the
+    // pre-check above and this write must win — this update then affects 0
+    // rows instead of silently overwriting whatever already happened.
     const updated = await tx.article.updateMany({
-      where: { id: articleId, status: { not: "TAKEN_DOWN" } },
+      where: { id: articleId, status: "PENDING" },
       data: approve
         ? { status: "PUBLISHED", publishedAt: new Date(), reviewNote: null }
-        : { status: "REJECTED", reviewNote: note ?? null },
+        : { status: "REJECTED", reviewNote: trimmedNote || null },
     });
-    if (updated.count === 0) return false;
+    if (updated.count !== 1) return false;
 
-    await createNotification(
-      {
-        userId: article.authorId,
-        type: "ARTICLE_MODERATED",
-        title: approve ? "Artykuł zatwierdzony" : "Artykuł odrzucony",
-        message: approve
-          ? `Twój artykuł „${article.title}” został zatwierdzony i opublikowany.`
-          : `Twój artykuł „${article.title}” został odrzucony.`,
-        // REJECTED articles aren't publicly viewable (see /artykul/[id]/page.tsx),
-        // so only an approved article can link straight to its own page.
-        link: approve ? `/artykul/${articleId}` : "/panel/dodaj",
-      },
-      tx,
-    );
+    // ETAP 12.4/F-12.4-09: a deleted (anonymized) author must never get a
+    // fresh Notification row — same guard already used by the emergency
+    // takedown/hide actions below, applied here too.
+    const author = await tx.user.findUnique({ where: { id: article.authorId }, select: { deletedAt: true } });
+    if (author && !author.deletedAt) {
+      await createNotification(
+        {
+          userId: article.authorId,
+          type: "ARTICLE_MODERATED",
+          title: approve ? "Artykuł zatwierdzony" : "Artykuł odrzucony",
+          message: approve
+            ? `Twój artykuł „${article.title}” został zatwierdzony i opublikowany.`
+            : `Twój artykuł „${article.title}” został odrzucony.`,
+          // REJECTED articles aren't publicly viewable (see /artykul/[id]/page.tsx),
+          // so only an approved article can link straight to its own page.
+          link: approve ? `/artykul/${articleId}` : "/panel/dodaj",
+        },
+        tx,
+      );
+    }
     return true;
   });
   if (!moderated) {
-    return { error: "Artykuł jest ukryty awaryjnie — nie można go zatwierdzić ani odrzucić." };
+    return { error: "Ten artykuł nie oczekuje już na moderację (mógł zostać już przetworzony)." };
   }
 
   revalidatePath("/panel/admin");
+  revalidatePath("/panel/dodaj");
   revalidatePath("/");
   return { success: true };
 }
@@ -183,6 +220,9 @@ export async function addPaymentAction(
 
   if (!description || Number.isNaN(amount) || amount <= 0) {
     return { error: "Podaj opis i poprawną kwotę." };
+  }
+  if (!fitsVarchar(description)) {
+    return { error: `Opis jest za długi (maksymalnie ${VARCHAR_191_MAX} znaków).` };
   }
 
   await prisma.payment.create({

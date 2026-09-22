@@ -82,10 +82,22 @@ async function ContentTab({ userId }: { userId: string }) {
           {myArticles.map((a) => (
             <li
               key={a.id}
-              className="flex items-center justify-between rounded border border-black/10 px-3 py-2 text-sm dark:border-white/10"
+              className="rounded border border-black/10 px-3 py-2 text-sm dark:border-white/10"
             >
-              <span>{a.title}</span>
-              <span className="text-black/60 dark:text-white/60">{STATUS_LABELS[a.status]}</span>
+              <div className="flex items-center justify-between">
+                <span>{a.title}</span>
+                <span className="text-black/60 dark:text-white/60">{STATUS_LABELS[a.status]}</span>
+              </div>
+              {/* ETAP 13.3C.4F.1 (A2/reviewNote): only ever shown to the
+                  article's own author, only for REJECTED, and only when a
+                  moderator actually left a note — never publicly, never for
+                  PUBLISHED/TAKEN_DOWN (see feed.ts's SERVER_ONLY_ARTICLE_FIELDS
+                  for why reviewNote never reaches a public listing at all). */}
+              {a.status === "REJECTED" && a.reviewNote && (
+                <p className="mt-1 whitespace-pre-wrap text-black/70 dark:text-white/70">
+                  <span className="font-medium">Uwagi moderatora:</span> {a.reviewNote}
+                </p>
+              )}
             </li>
           ))}
         </ul>

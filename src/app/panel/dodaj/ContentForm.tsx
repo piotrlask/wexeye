@@ -81,6 +81,7 @@ export default function ContentForm() {
         Podkategoria (opcjonalnie)
         <input
           name="subcategory"
+          maxLength={191}
           placeholder="np. Pożar, Koncert, Wypadek drogowy"
           className="rounded border border-black/20 px-3 py-2 dark:border-white/20"
         />
@@ -91,6 +92,7 @@ export default function ContentForm() {
         <input
           name="title"
           required
+          maxLength={191}
           className="rounded border border-black/20 px-3 py-2 dark:border-white/20"
         />
       </label>
@@ -137,19 +139,19 @@ export default function ContentForm() {
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm">
               Miasto
-              <input name="city" className="rounded border border-black/20 px-3 py-2 dark:border-white/20" />
+              <input name="city" maxLength={191} className="rounded border border-black/20 px-3 py-2 dark:border-white/20" />
             </label>
             <label className="flex flex-col gap-1 text-sm">
               Region
-              <input name="region" className="rounded border border-black/20 px-3 py-2 dark:border-white/20" />
+              <input name="region" maxLength={191} className="rounded border border-black/20 px-3 py-2 dark:border-white/20" />
             </label>
             <label className="flex flex-col gap-1 text-sm">
               Kraj
-              <input name="country" className="rounded border border-black/20 px-3 py-2 dark:border-white/20" />
+              <input name="country" maxLength={191} className="rounded border border-black/20 px-3 py-2 dark:border-white/20" />
             </label>
             <label className="flex flex-col gap-1 text-sm">
               Kontynent
-              <input name="continent" className="rounded border border-black/20 px-3 py-2 dark:border-white/20" />
+              <input name="continent" maxLength={191} className="rounded border border-black/20 px-3 py-2 dark:border-white/20" />
             </label>
           </div>
           <label className="flex items-center gap-2 text-sm">

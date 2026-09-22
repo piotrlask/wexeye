@@ -15,7 +15,7 @@ export default function PaymentForm() {
     <form ref={formRef} action={formAction} className="flex flex-wrap items-end gap-3">
       <label className="flex flex-col gap-1 text-sm">
         Opis
-        <input name="description" required placeholder="np. honorarium za sierpień" className="rounded border border-black/20 px-3 py-2 dark:border-white/20" />
+        <input name="description" required maxLength={191} placeholder="np. honorarium za sierpień" className="rounded border border-black/20 px-3 py-2 dark:border-white/20" />
       </label>
       <label className="flex flex-col gap-1 text-sm">
         Kwota (PLN)

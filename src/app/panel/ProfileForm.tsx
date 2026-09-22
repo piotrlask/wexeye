@@ -46,6 +46,7 @@ export default function ProfileForm({
           <input
             name="city"
             defaultValue={city ?? ""}
+            maxLength={191}
             className="rounded border border-black/20 px-3 py-2 dark:border-white/20"
           />
         </label>

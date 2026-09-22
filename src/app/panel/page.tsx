@@ -57,9 +57,13 @@ export default async function PanelPage({
   if (!user) return null;
 
   const friendIds = await getAcceptedFriendIds(user.id);
+  // ETAP 13.3C.4F.1 (A4): a share of an article that has since been taken
+  // down (or was never public to begin with) must not leak its title here —
+  // filtered in the query itself, not just in rendering, so a TAKEN_DOWN
+  // title never even leaves the DB for this list.
   const friendShares = friendIds.length
     ? await prisma.share.findMany({
-        where: { userId: { in: friendIds } },
+        where: { userId: { in: friendIds }, article: { status: "PUBLISHED" } },
         include: {
           user: { select: { name: true, avatarUrl: true } },
           article: { select: { title: true } },
@@ -144,17 +148,32 @@ export default async function PanelPage({
         <section className="mb-10">
           <h2 className="mb-3 text-lg font-semibold">Historia zakupów</h2>
           <ul className="flex flex-col gap-2">
-            {purchases.map((p) => (
-              <li
-                key={p.id}
-                className="flex items-center justify-between rounded border border-black/10 px-3 py-2 text-sm dark:border-white/10"
-              >
-                <span>{p.article ? p.article.title : TIER_LABELS[p.type] ?? p.type}</span>
-                <span className="text-black/60 dark:text-white/60">
-                  {(p.amountCents / 100).toFixed(2)}$ · {p.createdAt.toLocaleDateString("pl-PL")}
-                </span>
-              </li>
-            ))}
+            {purchases.map((p) => {
+              // ETAP 13.3C.4F.1 (A4): the Purchase row itself is always kept
+              // (financial/history retention, unchanged) — only the DISPLAY
+              // of its article's title is neutralized once that article
+              // isn't PUBLISHED anymore (taken down, or any other
+              // non-public status), so this list can't be used to see what a
+              // hidden article was about. No link is rendered here either
+              // way (this list has never linked to the article).
+              const articleVisible = !p.article || p.article.status === "PUBLISHED";
+              const label = p.article
+                ? articleVisible
+                  ? p.article.title
+                  : "Treść obecnie niedostępna"
+                : TIER_LABELS[p.type] ?? p.type;
+              return (
+                <li
+                  key={p.id}
+                  className="flex items-center justify-between rounded border border-black/10 px-3 py-2 text-sm dark:border-white/10"
+                >
+                  <span>{label}</span>
+                  <span className="text-black/60 dark:text-white/60">
+                    {(p.amountCents / 100).toFixed(2)}$ · {p.createdAt.toLocaleDateString("pl-PL")}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}

@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
+import { getSafeRedirectPath } from "@/lib/redirect";
 
 // F-08 (ETAP 7.16): CSP with a per-request nonce. Next.js App Router injects
 // its own inline hydration <script> tags on every page, so a script-src that
@@ -42,7 +43,17 @@ export default auth((req) => {
   const role = req.auth?.user?.role;
 
   if (pathname.startsWith("/panel") && !req.auth) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    // ETAP 13.3C.4F.1 (A3/17): send the visitor back to what they actually
+    // asked for after they log in — reusing the SAME safe-redirect check
+    // login/actions.ts applies when it later reads this back out of the
+    // form's "next" field (getSafeRedirectPath), not a second
+    // implementation. `pathname + search` is always same-origin here (it's
+    // parsed off this very request's own URL), so this can never smuggle an
+    // external redirect — the check is defense in depth, not load-bearing.
+    const loginUrl = new URL("/login", req.url);
+    const next = getSafeRedirectPath(pathname + req.nextUrl.search, "/panel");
+    if (next !== "/panel") loginUrl.searchParams.set("next", next);
+    return NextResponse.redirect(loginUrl);
   }
 
   if (pathname.startsWith("/panel/admin") && role !== "ADMIN") {

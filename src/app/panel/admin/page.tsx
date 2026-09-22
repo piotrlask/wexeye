@@ -142,7 +142,9 @@ async function ManagementTab() {
       }),
       prisma.article.findMany({
         where: { status: "PENDING" },
-        include: { author: { select: { name: true } } },
+        // media: needed for the ADMIN-only content preview (ETAP 13.3C.4F.1,
+        // A2) so a moderator can see what they're approving/rejecting.
+        include: { author: { select: { name: true } }, media: true },
         orderBy: { createdAt: "asc" },
       }),
       prisma.payment.findMany({ orderBy: { createdAt: "desc" } }),
@@ -260,6 +262,9 @@ async function ManagementTab() {
                 title={a.title}
                 author={a.author.name}
                 category={a.category}
+                subcategory={a.subcategory}
+                body={a.body}
+                media={a.media.map((m) => ({ id: m.id, type: m.type, url: m.url }))}
               />
             ))}
           </ul>

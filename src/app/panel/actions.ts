@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { isReader } from "@/lib/access";
 import { CONTACT_EMAILS } from "@/lib/legal";
 import { MAX_DIRECT_REFERRALS, GENDERS } from "@/lib/constants";
+import { fitsVarchar, VARCHAR_191_MAX } from "@/lib/validation";
 import {
   getClientIp,
   checkChangePasswordRateLimit,
@@ -118,6 +119,10 @@ export async function updateProfileAction(
   const gender = String(formData.get("gender") ?? "").trim();
   const ageRaw = String(formData.get("age") ?? "").trim();
 
+  // ETAP 13.3C.4F.1 (A5): User.city is a plain VARCHAR(191) column.
+  if (!fitsVarchar(city)) {
+    return { error: `Miejscowość jest za długa (maksymalnie ${VARCHAR_191_MAX} znaków).` };
+  }
   if (gender && !GENDERS.includes(gender as (typeof GENDERS)[number])) {
     return { error: "Nieprawidłowa płeć." };
   }

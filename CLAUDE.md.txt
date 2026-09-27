@@ -57,7 +57,7 @@ const password = process.env.ADMIN_PASSWORD;
 
 Nigdy:
 
-const password = "admin123";
+const password = "[RETIRED_ADMIN_PASSWORD_REDACTED]";
 
 ---
 
@@ -303,7 +303,7 @@ Nie twórz administratorów z hasłami wpisanymi bezpośrednio w kod.
 
 Nie używaj:
 
-admin123
+[RETIRED_ADMIN_PASSWORD_REDACTED]
 password
 123456
 admin

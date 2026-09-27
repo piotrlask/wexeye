@@ -196,20 +196,38 @@ jobs:
           if [ -d "$REL/.git" ]; then
             echo "::error::release contains .git"; FAIL=1
           fi
-          if find "$REL" -type d -iname '*uploads*' | grep -q .; then
-            echo "::error::release contains an uploads directory"; FAIL=1
-          fi
+          # The repo's own public/uploads/.gitkeep placeholder (see
+          # .gitignore) is expected and harmless — the runtime needs that
+          # empty directory to exist. Only fail if it actually contains
+          # uploaded data (anything other than .gitkeep).
+          while IFS= read -r d; do
+            if find "$d" -type f ! -name '.gitkeep' | grep -q .; then
+              echo "::error::release contains an uploads directory with data: $d"; FAIL=1
+            fi
+          done < <(find "$REL" -type d -iname '*uploads*' 2>/dev/null || true)
           if find "$REL" -type d -iname '*quarantine*' | grep -q .; then
             echo "::error::release contains a quarantine directory"; FAIL=1
           fi
           if find "$REL" -type f \( -iname '*.pem' -o -iname 'id_rsa*' -o -iname 'id_ed25519*' -o -iname '*.ppk' \) | grep -q .; then
             echo "::error::release contains a private-key-named file"; FAIL=1
           fi
-          if find "$REL" -type f \( -iname '*.sql' -o -iname '*dump*.gz' -o -iname '*backup*.tar*' -o -iname '*backup*.zip' \) | grep -q .; then
+          # prisma/migrations/**/migration.sql is the one expected, legitimate
+          # first-party location for .sql files (schema DDL, no data) — it's
+          # required at runtime for `prisma migrate deploy` and is excluded
+          # here. Anything else named like a dump/backup is forbidden.
+          if find "$REL" -type f -iname '*.sql' -not -path "$REL/prisma/migrations/*" | grep -q .; then
+            echo "::error::release contains an unexpected .sql file outside prisma/migrations"; FAIL=1
+          fi
+          if find "$REL" -type f \( -iname '*dump*.gz' -o -iname '*dump*.sql*' -o -iname '*backup*.tar*' -o -iname '*backup*.zip' \) -not -path "$REL/prisma/migrations/*" | grep -q .; then
             echo "::error::release contains a database dump / backup archive"; FAIL=1
           fi
-          if find "$REL" -type f -iname '*credentials*' | grep -q .; then
-            echo "::error::release contains a file named like a credentials file"; FAIL=1
+          # Excludes node_modules: "credentials" is a common, benign source
+          # filename there (e.g. next-auth's/next-auth's underlying @auth/core's
+          # own "Credentials provider" — providers/credentials.js — an auth
+          # method name, not a stored credential). First-party code should
+          # never have a file named like this.
+          if find "$REL" -type f -iname '*credentials*' -not -path "$REL/node_modules/*" | grep -q .; then
+            echo "::error::release contains a first-party file named like a credentials file"; FAIL=1
           fi
 
           if [ "$FAIL" -ne 0 ]; then

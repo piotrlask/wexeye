@@ -56,14 +56,17 @@ jobs:
 
       - name: Confirm workflow declares no repository secrets
         # Structural self-check (Layer C, part 1): this workflow must never
-        # gain a `secrets.*` reference. If it ever does, no real secret
-        # could have leaked into THIS run (that reference wouldn't exist
-        # yet), but failing loudly here stops any future edit that would
-        # start feeding real credentials into a build job from ever running
-        # unnoticed.
+        # start reading from the GitHub Actions secrets context. If it ever
+        # does, no real secret could have leaked into THIS run (that usage
+        # wouldn't exist yet), but failing loudly here stops any future edit
+        # that would start feeding real credentials into a build job from
+        # ever running unnoticed. The pattern below matches only actual
+        # expression-interpolation usage, not prose that merely discusses
+        # this check (see this comment block itself, which mentions the
+        # words without triggering it).
         run: |
-          if grep -n 'secrets\.' .github/workflows/release-build.yml; then
-            echo "::error::release-build.yml references \${{ secrets.* }} — this build workflow must never use repository secrets"
+          if grep -nE '\$\{\{[[:space:]]*secrets\.' .github/workflows/release-build.yml; then
+            echo "::error::release-build.yml interpolates a value from the GitHub Actions secrets context — this build workflow must never use repository secrets"
             exit 1
           fi
           echo "Confirmed: workflow uses no repository secrets."

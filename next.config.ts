@@ -24,6 +24,16 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Standalone output traces the actual runtime dependency graph and copies
+  // only those packages into .next/standalone/node_modules, instead of
+  // shipping the full (dev+prod) node_modules tree. This keeps the staging
+  // deploy artifact small enough to transfer through the hosting panel's
+  // file tools. public/ and .next/static still need to be copied alongside
+  // .next/standalone manually (see .github/workflows/release-build.yml) —
+  // Next.js does not do this automatically. The custom server (app.js) is
+  // unaffected: it still calls next({dev:false}) and works against the
+  // traced node_modules the same way it did against the full one.
+  output: "standalone",
   async headers() {
     return [
       {

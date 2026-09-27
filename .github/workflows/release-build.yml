@@ -159,17 +159,24 @@ jobs:
           REL="release-${SHA}"
           mkdir -p "$REL"
 
-          # Runtime requirements for this app (no next.config output:
-          # "standalone", custom app.js server): .next build output, public
-          # assets, full node_modules (kept whole per this stage's decision
-          # — no devDependency pruning for the first staging release),
-          # package manifest/lockfile, the custom server entry, the next
-          # config + tsconfig it's loaded with at runtime, and prisma/
-          # (schema + migrations) for later `prisma migrate deploy`.
-          cp -a .next "$REL/.next"
-          cp -a public "$REL/public"
-          cp -a node_modules "$REL/node_modules"
-          cp package.json package-lock.json app.js next.config.ts tsconfig.json "$REL/"
+          # next.config.ts now sets output: "standalone", so .next/standalone
+          # already contains a traced (production-only) node_modules, the
+          # generated server.js, package.json and public/ — a fraction of
+          # the size of the full repo node_modules. Only .next/static is not
+          # copied in automatically by Next.js and must be added by hand.
+          # Passenger's app is registered with startup entry "app.js" by
+          # convention, so the generated server.js (which already reads
+          # PORT/HOSTNAME from the environment, same as any Passenger Node
+          # app) is used directly as app.js rather than kept as a separate
+          # custom server — see next.config.ts's comment for why this is
+          # safe with the existing custom-server-style app.js it replaces.
+          cp -a .next/standalone/. "$REL/"
+          mkdir -p "$REL/.next"
+          cp -a .next/static "$REL/.next/static"
+          mv "$REL/server.js" "$REL/app.js"
+          # prisma/ (schema + migrations) for `prisma migrate deploy` on the
+          # server; not included in the standalone trace since it's not a
+          # runtime import.
           cp -a prisma "$REL/prisma"
           if [ -f .env.example ]; then cp .env.example "$REL/.env.example"; fi
 
@@ -343,7 +350,7 @@ jobs:
           BUILD_RESULT=PASS
           PUBLIC_BASE_URL=${{ steps.target.outputs.base_url }}
           PASSENGER_STARTUP_ENTRY=app.js
-          PACKAGING_STRATEGY=full-node_modules (no output:standalone in next.config.ts; devDependencies retained, not pruned, for this first staging release)
+          PACKAGING_STRATEGY=standalone (next.config.ts output:"standalone"; traced production-only node_modules, generated server.js used as app.js)
           ARTIFACT_FILENAME=${FILENAME}
           ARTIFACT_BYTES=${BYTES}
           ARTIFACT_SHA256=${SHA256}

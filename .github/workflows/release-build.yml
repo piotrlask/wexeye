@@ -249,9 +249,14 @@ jobs:
           # generic regex reliably produces false positives (publicly known
           # test PEM keys, minified strings that coincidentally match a
           # key-shaped pattern, etc.) rather than real findings. Dependency
-          # integrity is instead covered by Layer C below.
+          # integrity is instead covered by Layer C below. Also excludes
+          # *.map (webpack/Next debug source maps): they encode arbitrary
+          # bundled framework content — including plain-English mangled
+          # identifiers (e.g. React's own "isPending"/"startTransition"
+          # naming can literally produce "re_pending...") — that coincide
+          # with key-shaped regexes far more often than real code does.
           SCAN_ARGS=(-rlIE)
-          EXCLUDE=(--exclude-dir=node_modules)
+          EXCLUDE=(--exclude-dir=node_modules --exclude-dir=.next/dev --exclude=*.map)
 
           if grep "${SCAN_ARGS[@]}" "${EXCLUDE[@]}" -- '-----BEGIN (RSA |EC |OPENSSH |)PRIVATE KEY-----' "$REL" 2>/dev/null | grep -q .; then
             echo "::error::first-party release content contains private key material"; FAIL=1

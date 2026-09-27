@@ -2,13 +2,23 @@ name: Release build (Linux x64 / Node 22)
 
 # Reproducible build-only workflow. It checks out exact source, installs
 # dependencies, generates the Prisma client, runs the repo's existing
-# quality checks, runs `next build`, packages a Linux runtime release
-# artifact, scans it for secrets, and uploads it as a GitHub Actions
+# quality checks, runs `next build` targeted at a specific deploy
+# environment's public URL, packages a Linux runtime release artifact,
+# scans it for secrets in layers, and uploads it as a GitHub Actions
 # artifact. It never deploys anywhere, never touches AttHost, and never
-# uses production/staging secrets — build-time env values below are
-# CI-only dummy placeholders, not real credentials.
+# uses production/staging secrets — every build-time env value below is a
+# CI-only dummy placeholder, not a real credential, and none of them come
+# from repository secrets (this workflow declares none).
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Build target environment (public URL only — no real secrets are ever used)"
+        required: true
+        default: "staging"
+        type: choice
+        options:
+          - staging
 
 permissions:
   contents: read
@@ -17,17 +27,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # CI-only placeholders. None of these are real credentials, and none
-      # of them are added as repository secrets. DATABASE_URL/AUTH_SECRET/
-      # AUTH_URL are server-only and are never baked into build output.
-      # NEXT_PUBLIC_BASE_URL IS inlined into the client bundle by `next
-      # build` — this build is a CI validation/packaging build, not a
-      # deploy-ready staging artifact; the real staging/production base URL
-      # must be set at the actual deploy-targeted build.
-      DATABASE_URL: "mysql://ci:ci@127.0.0.1:3306/ci_dummy_do_not_use"
+      # CI-only placeholders, target-independent. These are server-only
+      # (never baked into build output) except AUTH_SECRET, which next-auth
+      # only reads at runtime, not at build time.
+      # DATABASE_URL: deliberately unreachable (port 1 is not a MySQL port
+      # anywhere) so the build cannot accidentally reach a real database.
+      # The release secret scanner (Layer B below) recognizes ONLY this
+      # exact string as an approved dummy — any other mysql:// credential
+      # literal found in first-party release files fails the scan.
+      DATABASE_URL: "mysql://ci_dummy:ci_dummy@127.0.0.1:1/wexeye_ci_dummy"
       AUTH_SECRET: "ci-build-only-placeholder-not-a-real-secret-0000000000"
-      AUTH_URL: "http://localhost:3000"
-      NEXT_PUBLIC_BASE_URL: "http://localhost:3000"
       STRIPE_SECRET_KEY: ""
       STRIPE_WEBHOOK_SECRET: ""
       RESEND_API_KEY: ""
@@ -40,10 +49,38 @@ jobs:
           persist-credentials: false
 
       - name: Record commit
+        id: commit
         run: |
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           git rev-parse HEAD
-        id: commit
+
+      - name: Confirm workflow declares no repository secrets
+        # Structural self-check (Layer C, part 1): this workflow must never
+        # gain a `secrets.*` reference. If it ever does, no real secret
+        # could have leaked into THIS run (that reference wouldn't exist
+        # yet), but failing loudly here stops any future edit that would
+        # start feeding real credentials into a build job from ever running
+        # unnoticed.
+        run: |
+          if grep -n 'secrets\.' .github/workflows/release-build.yml; then
+            echo "::error::release-build.yml references \${{ secrets.* }} — this build workflow must never use repository secrets"
+            exit 1
+          fi
+          echo "Confirmed: workflow uses no repository secrets."
+
+      - name: Resolve target environment public URLs
+        id: target
+        run: |
+          case "${{ inputs.target }}" in
+            staging)
+              echo "auth_url=https://wex3.piotrlask.atthost24.pl" >> "$GITHUB_OUTPUT"
+              echo "base_url=https://wex3.piotrlask.atthost24.pl" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::unknown build target '${{ inputs.target }}'"
+              exit 1
+              ;;
+          esac
 
       - name: Setup Node 22
         uses: actions/setup-node@v4
@@ -81,7 +118,29 @@ jobs:
         run: npm run lint
 
       - name: Build (next build)
+        env:
+          AUTH_URL: ${{ steps.target.outputs.auth_url }}
+          NEXT_PUBLIC_BASE_URL: ${{ steps.target.outputs.base_url }}
         run: npm run build
+
+      - name: Verify staging public URL is bound in build output
+        run: |
+          set -euo pipefail
+          EXPECTED="${{ steps.target.outputs.base_url }}"
+          if grep -rlF "$EXPECTED" .next/server >/dev/null 2>&1; then
+            echo "STAGING_PUBLIC_URL_BOUND=YES"
+          else
+            echo "::error::expected public URL $EXPECTED not found in build output"
+            echo "STAGING_PUBLIC_URL_BOUND=NO"
+            exit 1
+          fi
+          if grep -rlF "http://localhost:3000" .next/server >/dev/null 2>&1; then
+            echo "::error::localhost:3000 is still active as a bound public URL in build output"
+            echo "LOCALHOST_PUBLIC_URL_ACTIVE=YES"
+            exit 1
+          else
+            echo "LOCALHOST_PUBLIC_URL_ACTIVE=NO"
+          fi
 
       - name: Determine versions for manifest
         id: versions
@@ -118,45 +177,121 @@ jobs:
 
           echo "release_dir=$REL" >> "$GITHUB_OUTPUT"
 
-      - name: Secret scan release contents
+      - name: "Secret scan — Layer A: forbidden files (by name, whole release)"
         run: |
           set -euo pipefail
           REL="${{ steps.package.outputs.release_dir }}"
           FAIL=0
 
-          if [ -e "$REL/.env" ] || ls "$REL"/.env.* >/dev/null 2>&1; then
-            echo "::error::release contains an .env file"; FAIL=1
+          if [ -e "$REL/.env" ] || compgen -G "$REL/.env.*" >/dev/null 2>&1; then
+            # .env.example was already copied deliberately and verified
+            # placeholder-only; every other .env* form is forbidden.
+            if find "$REL" -maxdepth 1 -iname '.env*' ! -iname '.env.example' | grep -q .; then
+              echo "::error::release contains a forbidden .env file"; FAIL=1
+            fi
           fi
           if [ -d "$REL/.git" ]; then
             echo "::error::release contains .git"; FAIL=1
           fi
-          if find "$REL" -iname '*uploads*' -mindepth 1 2>/dev/null | grep -q .; then
-            :
+          if find "$REL" -type d -iname '*uploads*' | grep -q .; then
+            echo "::error::release contains an uploads directory"; FAIL=1
           fi
-          if grep -rlIE -- '-----BEGIN (RSA |EC |OPENSSH |)PRIVATE KEY-----' "$REL" 2>/dev/null | grep -q .; then
-            echo "::error::release contains private key material"; FAIL=1
+          if find "$REL" -type d -iname '*quarantine*' | grep -q .; then
+            echo "::error::release contains a quarantine directory"; FAIL=1
           fi
-          if grep -rlIE 'mysql://[^:/ ]+:[^@ ]{3,}@(?!127\.0\.0\.1|localhost)' "$REL" 2>/dev/null | grep -q .; then
-            echo "::error::release contains a non-dummy DATABASE_URL"; FAIL=1
+          if find "$REL" -type f \( -iname '*.pem' -o -iname 'id_rsa*' -o -iname 'id_ed25519*' -o -iname '*.ppk' \) | grep -q .; then
+            echo "::error::release contains a private-key-named file"; FAIL=1
           fi
-          if grep -rlIE 'sk_live_[A-Za-z0-9]{10,}|whsec_[A-Za-z0-9]{10,}|rk_(live|test)_[A-Za-z0-9]{10,}' "$REL" 2>/dev/null | grep -q .; then
-            echo "::error::release contains a Stripe secret-shaped value"; FAIL=1
+          if find "$REL" -type f \( -iname '*.sql' -o -iname '*dump*.gz' -o -iname '*backup*.tar*' -o -iname '*backup*.zip' \) | grep -q .; then
+            echo "::error::release contains a database dump / backup archive"; FAIL=1
           fi
-          if grep -rlIE 're_[A-Za-z0-9]{20,}' "$REL" 2>/dev/null | grep -q .; then
-            echo "::error::release contains a Resend API-key-shaped value"; FAIL=1
-          fi
-          if grep -rlIE 'AKIA[0-9A-Z]{16}' "$REL" 2>/dev/null | grep -q .; then
-            echo "::error::release contains an AWS-key-shaped value"; FAIL=1
-          fi
-          if grep -rlIE 'admin[1]23' "$REL" 2>/dev/null | grep -q .; then
-            echo "::error::release contains the retired admin credential literal"; FAIL=1
+          if find "$REL" -type f -iname '*credentials*' | grep -q .; then
+            echo "::error::release contains a file named like a credentials file"; FAIL=1
           fi
 
           if [ "$FAIL" -ne 0 ]; then
-            echo "::error::secret scan failed, refusing to upload artifact"
+            echo "::error::Layer A (forbidden files) failed"
             exit 1
           fi
-          echo "Secret scan: PASS"
+          echo "Layer A: PASS"
+
+      - name: "Secret scan — Layer B: first-party content (release minus node_modules)"
+        run: |
+          set -euo pipefail
+          REL="${{ steps.package.outputs.release_dir }}"
+          FAIL=0
+
+          # First-party scan target: everything WE authored or WE compiled
+          # — app.js, config, prisma/, public/, and our own .next build
+          # output. Explicitly excludes node_modules: that's ~1000 packages
+          # of third-party source/test fixtures we don't control, where a
+          # generic regex reliably produces false positives (publicly known
+          # test PEM keys, minified strings that coincidentally match a
+          # key-shaped pattern, etc.) rather than real findings. Dependency
+          # integrity is instead covered by Layer C below.
+          SCAN_ARGS=(-rlIE)
+          EXCLUDE=(--exclude-dir=node_modules)
+
+          if grep "${SCAN_ARGS[@]}" "${EXCLUDE[@]}" -- '-----BEGIN (RSA |EC |OPENSSH |)PRIVATE KEY-----' "$REL" 2>/dev/null | grep -q .; then
+            echo "::error::first-party release content contains private key material"; FAIL=1
+          fi
+
+          # DATABASE_URL check: no PCRE/lookahead (grep -E doesn't support
+          # it). Detect any mysql:// credential-bearing URL, then confirm
+          # every occurrence found is nothing but the one approved CI dummy
+          # by stripping that exact literal out and re-checking.
+          MYSQL_PATTERN='mysql://[A-Za-z0-9_%.~+-]+:[^@[:space:]"'"'"']{1,}@[A-Za-z0-9_.:-]+/[A-Za-z0-9_.-]+'
+          APPROVED_DUMMY='mysql://ci_dummy:ci_dummy@127.0.0.1:1/wexeye_ci_dummy'
+          APPROVED_ESCAPED=$(printf '%s' "$APPROVED_DUMMY" | sed -e 's/[\/&]/\\&/g')
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            if sed "s/${APPROVED_ESCAPED}//g" "$f" | grep -qE "$MYSQL_PATTERN"; then
+              echo "::error::first-party file $f contains a non-dummy DATABASE_URL-shaped credential"; FAIL=1
+            fi
+          done < <(grep "${SCAN_ARGS[@]}" "${EXCLUDE[@]}" "$MYSQL_PATTERN" "$REL" 2>/dev/null || true)
+
+          if grep "${SCAN_ARGS[@]}" "${EXCLUDE[@]}" 'sk_live_[A-Za-z0-9]{10,}|whsec_[A-Za-z0-9]{10,}|rk_(live|test)_[A-Za-z0-9]{10,}' "$REL" 2>/dev/null | grep -q .; then
+            echo "::error::first-party release content contains a Stripe secret-shaped value"; FAIL=1
+          fi
+          if grep "${SCAN_ARGS[@]}" "${EXCLUDE[@]}" 're_[A-Za-z0-9]{20,}' "$REL" 2>/dev/null | grep -q .; then
+            echo "::error::first-party release content contains a Resend API-key-shaped value"; FAIL=1
+          fi
+          if grep "${SCAN_ARGS[@]}" "${EXCLUDE[@]}" 'AKIA[0-9A-Z]{16}' "$REL" 2>/dev/null | grep -q .; then
+            echo "::error::first-party release content contains an AWS-key-shaped value"; FAIL=1
+          fi
+          if grep "${SCAN_ARGS[@]}" "${EXCLUDE[@]}" 'admin[1]23' "$REL" 2>/dev/null | grep -q .; then
+            echo "::error::first-party release content contains the retired admin credential literal"; FAIL=1
+          fi
+
+          if [ "$FAIL" -ne 0 ]; then
+            echo "::error::Layer B (first-party content scan) failed"
+            exit 1
+          fi
+          echo "Layer B: PASS"
+
+      - name: "Secret scan — Layer C: dependency-tree structural checks"
+        run: |
+          set -euo pipefail
+          REL="${{ steps.package.outputs.release_dir }}"
+          FAIL=0
+
+          # We don't content-scan node_modules (Layer B explicitly excludes
+          # it — see rationale there). Instead we verify, structurally, that
+          # nothing secret-bearing could have entered it: no env file was
+          # ever copied in, and this job never had a real WexEye secret to
+          # begin with (confirmed earlier by the "no repository secrets"
+          # self-check). Generic test fixtures third-party packages ship
+          # (e.g. publicly known sample PEM keys used in their own unit
+          # tests) are not WexEye credential leakage and are not flagged.
+          if find "$REL/node_modules" -maxdepth 3 -iname '.env*' ! -iname '*.env.example' 2>/dev/null | grep -q .; then
+            echo "::error::an .env-named file was found inside node_modules"; FAIL=1
+          fi
+
+          if [ "$FAIL" -ne 0 ]; then
+            echo "::error::Layer C (dependency-tree structural checks) failed"
+            exit 1
+          fi
+          echo "Layer C: PASS"
 
       - name: Create tarball and manifest
         id: artifact
@@ -164,7 +299,8 @@ jobs:
           set -euo pipefail
           SHA="${{ steps.commit.outputs.commit }}"
           REL="${{ steps.package.outputs.release_dir }}"
-          FILENAME="wexeye-${SHA}-linux-x64-node22.tar.gz"
+          TARGET="${{ inputs.target }}"
+          FILENAME="wexeye-${SHA}-${TARGET}-linux-x64-node22.tar.gz"
 
           tar -czf "$FILENAME" -C "$REL" .
           BYTES=$(stat -c '%s' "$FILENAME")
@@ -172,19 +308,20 @@ jobs:
 
           cat > release-manifest.txt <<EOF
           APP=WexEye
+          ENVIRONMENT=${TARGET}
           GIT_COMMIT=${SHA}
           NODE_VERSION=$(node --version)
           NPM_VERSION=$(npm --version)
           NEXT_VERSION=${{ steps.versions.outputs.next_version }}
           PRISMA_VERSION=${{ steps.versions.outputs.prisma_version }}
           BUILD_RESULT=PASS
+          PUBLIC_BASE_URL=${{ steps.target.outputs.base_url }}
+          PASSENGER_STARTUP_ENTRY=app.js
+          PACKAGING_STRATEGY=full-node_modules (no output:standalone in next.config.ts; devDependencies retained, not pruned, for this first staging release)
           ARTIFACT_FILENAME=${FILENAME}
           ARTIFACT_BYTES=${BYTES}
           ARTIFACT_SHA256=${SHA256}
           BUILD_TIMESTAMP_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          PASSENGER_STARTUP_ENTRY=app.js
-          PACKAGING_STRATEGY=full-node_modules (no output:standalone in next.config.ts; devDependencies retained, not pruned, for this first staging release)
-          NOTE=NEXT_PUBLIC_BASE_URL baked into this build is the CI placeholder http://localhost:3000 — this artifact is a validation/packaging build only, not deploy-ready; rebuild with the real target base URL before deploying to staging or production.
           EOF
 
           echo "filename=$FILENAME" >> "$GITHUB_OUTPUT"

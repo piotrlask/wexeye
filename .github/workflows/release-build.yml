@@ -1,0 +1,205 @@
+name: Release build (Linux x64 / Node 22)
+
+# Reproducible build-only workflow. It checks out exact source, installs
+# dependencies, generates the Prisma client, runs the repo's existing
+# quality checks, runs `next build`, packages a Linux runtime release
+# artifact, scans it for secrets, and uploads it as a GitHub Actions
+# artifact. It never deploys anywhere, never touches AttHost, and never
+# uses production/staging secrets — build-time env values below are
+# CI-only dummy placeholders, not real credentials.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # CI-only placeholders. None of these are real credentials, and none
+      # of them are added as repository secrets. DATABASE_URL/AUTH_SECRET/
+      # AUTH_URL are server-only and are never baked into build output.
+      # NEXT_PUBLIC_BASE_URL IS inlined into the client bundle by `next
+      # build` — this build is a CI validation/packaging build, not a
+      # deploy-ready staging artifact; the real staging/production base URL
+      # must be set at the actual deploy-targeted build.
+      DATABASE_URL: "mysql://ci:ci@127.0.0.1:3306/ci_dummy_do_not_use"
+      AUTH_SECRET: "ci-build-only-placeholder-not-a-real-secret-0000000000"
+      AUTH_URL: "http://localhost:3000"
+      NEXT_PUBLIC_BASE_URL: "http://localhost:3000"
+      STRIPE_SECRET_KEY: ""
+      STRIPE_WEBHOOK_SECRET: ""
+      RESEND_API_KEY: ""
+      EMAIL_FROM: ""
+      QUARANTINE_DIR: "/tmp/wexeye-ci-quarantine"
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Record commit
+        run: |
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git rev-parse HEAD
+        id: commit
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Versions
+        run: |
+          node --version
+          npm --version
+
+      - name: npm ci
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify tracked files unchanged after npm ci
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::npm ci modified tracked files"
+            git status --porcelain
+            exit 1
+          fi
+
+      - name: Verify Prisma client (generate only if missing)
+        run: |
+          if [ -d node_modules/.prisma/client ]; then
+            echo "Prisma client already generated (via npm ci postinstall)."
+          else
+            echo "Prisma client missing, generating explicitly (client generation only, no migrate/push/seed)."
+            npx prisma generate
+          fi
+          test -d node_modules/.prisma/client
+
+      - name: Lint (existing script only)
+        run: npm run lint
+
+      - name: Build (next build)
+        run: npm run build
+
+      - name: Determine versions for manifest
+        id: versions
+        run: |
+          echo "next_version=$(node -e "console.log(require('./node_modules/next/package.json').version)")" >> "$GITHUB_OUTPUT"
+          echo "prisma_version=$(node -e "console.log(require('./node_modules/prisma/package.json').version)")" >> "$GITHUB_OUTPUT"
+
+      - name: Package Linux runtime release
+        id: package
+        run: |
+          set -euo pipefail
+          SHA="${{ steps.commit.outputs.commit }}"
+          REL="release-${SHA}"
+          mkdir -p "$REL"
+
+          # Runtime requirements for this app (no next.config output:
+          # "standalone", custom app.js server): .next build output, public
+          # assets, full node_modules (kept whole per this stage's decision
+          # — no devDependency pruning for the first staging release),
+          # package manifest/lockfile, the custom server entry, the next
+          # config + tsconfig it's loaded with at runtime, and prisma/
+          # (schema + migrations) for later `prisma migrate deploy`.
+          cp -a .next "$REL/.next"
+          cp -a public "$REL/public"
+          cp -a node_modules "$REL/node_modules"
+          cp package.json package-lock.json app.js next.config.ts tsconfig.json "$REL/"
+          cp -a prisma "$REL/prisma"
+          if [ -f .env.example ]; then cp .env.example "$REL/.env.example"; fi
+
+          # Absolute exclusion of anything secret-bearing or upload-derived,
+          # even if it somehow existed in the workspace.
+          rm -rf "$REL"/.env "$REL"/.env.* "$REL"/.git
+          find "$REL" -maxdepth 2 -iname '*.env' -delete 2>/dev/null || true
+
+          echo "release_dir=$REL" >> "$GITHUB_OUTPUT"
+
+      - name: Secret scan release contents
+        run: |
+          set -euo pipefail
+          REL="${{ steps.package.outputs.release_dir }}"
+          FAIL=0
+
+          if [ -e "$REL/.env" ] || ls "$REL"/.env.* >/dev/null 2>&1; then
+            echo "::error::release contains an .env file"; FAIL=1
+          fi
+          if [ -d "$REL/.git" ]; then
+            echo "::error::release contains .git"; FAIL=1
+          fi
+          if find "$REL" -iname '*uploads*' -mindepth 1 2>/dev/null | grep -q .; then
+            :
+          fi
+          if grep -rlIE -- '-----BEGIN (RSA |EC |OPENSSH |)PRIVATE KEY-----' "$REL" 2>/dev/null | grep -q .; then
+            echo "::error::release contains private key material"; FAIL=1
+          fi
+          if grep -rlIE 'mysql://[^:/ ]+:[^@ ]{3,}@(?!127\.0\.0\.1|localhost)' "$REL" 2>/dev/null | grep -q .; then
+            echo "::error::release contains a non-dummy DATABASE_URL"; FAIL=1
+          fi
+          if grep -rlIE 'sk_live_[A-Za-z0-9]{10,}|whsec_[A-Za-z0-9]{10,}|rk_(live|test)_[A-Za-z0-9]{10,}' "$REL" 2>/dev/null | grep -q .; then
+            echo "::error::release contains a Stripe secret-shaped value"; FAIL=1
+          fi
+          if grep -rlIE 're_[A-Za-z0-9]{20,}' "$REL" 2>/dev/null | grep -q .; then
+            echo "::error::release contains a Resend API-key-shaped value"; FAIL=1
+          fi
+          if grep -rlIE 'AKIA[0-9A-Z]{16}' "$REL" 2>/dev/null | grep -q .; then
+            echo "::error::release contains an AWS-key-shaped value"; FAIL=1
+          fi
+          if grep -rlIE 'admin[1]23' "$REL" 2>/dev/null | grep -q .; then
+            echo "::error::release contains the retired admin credential literal"; FAIL=1
+          fi
+
+          if [ "$FAIL" -ne 0 ]; then
+            echo "::error::secret scan failed, refusing to upload artifact"
+            exit 1
+          fi
+          echo "Secret scan: PASS"
+
+      - name: Create tarball and manifest
+        id: artifact
+        run: |
+          set -euo pipefail
+          SHA="${{ steps.commit.outputs.commit }}"
+          REL="${{ steps.package.outputs.release_dir }}"
+          FILENAME="wexeye-${SHA}-linux-x64-node22.tar.gz"
+
+          tar -czf "$FILENAME" -C "$REL" .
+          BYTES=$(stat -c '%s' "$FILENAME")
+          SHA256=$(sha256sum "$FILENAME" | awk '{print $1}')
+
+          cat > release-manifest.txt <<EOF
+          APP=WexEye
+          GIT_COMMIT=${SHA}
+          NODE_VERSION=$(node --version)
+          NPM_VERSION=$(npm --version)
+          NEXT_VERSION=${{ steps.versions.outputs.next_version }}
+          PRISMA_VERSION=${{ steps.versions.outputs.prisma_version }}
+          BUILD_RESULT=PASS
+          ARTIFACT_FILENAME=${FILENAME}
+          ARTIFACT_BYTES=${BYTES}
+          ARTIFACT_SHA256=${SHA256}
+          BUILD_TIMESTAMP_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          PASSENGER_STARTUP_ENTRY=app.js
+          PACKAGING_STRATEGY=full-node_modules (no output:standalone in next.config.ts; devDependencies retained, not pruned, for this first staging release)
+          NOTE=NEXT_PUBLIC_BASE_URL baked into this build is the CI placeholder http://localhost:3000 — this artifact is a validation/packaging build only, not deploy-ready; rebuild with the real target base URL before deploying to staging or production.
+          EOF
+
+          echo "filename=$FILENAME" >> "$GITHUB_OUTPUT"
+          echo "bytes=$BYTES" >> "$GITHUB_OUTPUT"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+
+          echo "== manifest =="
+          cat release-manifest.txt
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact.outputs.filename }}
+          path: |
+            ${{ steps.artifact.outputs.filename }}
+            release-manifest.txt
+          retention-days: 14
+          if-no-files-found: error

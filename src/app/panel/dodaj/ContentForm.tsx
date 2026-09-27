@@ -17,10 +17,23 @@ export default function ContentForm() {
   const [locating, setLocating] = useState(false);
   const [locationHidden, setLocationHidden] = useState(false);
 
+  // Reset the WHERE picker as soon as a successful submission's result
+  // arrives — adjusted during render (React's documented pattern for
+  // resetting state when a prop/derived value changes) rather than in an
+  // effect, since no external system is involved here.
+  const [handledState, setHandledState] = useState(state);
+  if (state !== handledState) {
+    setHandledState(state);
+    if (state?.success) {
+      setCoords(null);
+    }
+  }
+
+  // The actual form-field reset is a DOM mutation (an external system),
+  // so it stays in an effect, run after the successful-result render commits.
   useEffect(() => {
     if (state?.success) {
       formRef.current?.reset();
-      setCoords(null);
     }
   }, [state]);
 

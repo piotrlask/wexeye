@@ -1,11 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PRICING, type PurchaseType } from "@/lib/constants";
 
 export default function CheckoutButtons({ articleId }: { articleId?: string }) {
   const [loading, setLoading] = useState<PurchaseType | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Stripe Checkout URL to navigate to — external destination, so the
+  // actual navigation happens in an effect rather than directly inside the
+  // click handler.
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (redirectUrl) {
+      window.location.href = redirectUrl;
+    }
+  }, [redirectUrl]);
 
   async function checkout(type: PurchaseType) {
     setError(null);
@@ -22,7 +32,7 @@ export default function CheckoutButtons({ articleId }: { articleId?: string }) {
         setLoading(null);
         return;
       }
-      window.location.href = data.url;
+      setRedirectUrl(data.url);
     } catch {
       setError("Nie udało się połączyć z płatnościami.");
       setLoading(null);

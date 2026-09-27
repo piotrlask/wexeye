@@ -13,6 +13,12 @@ export default function NearYouLocation() {
   useEffect(() => {
     if (hasCoords) return;
     if (!("geolocation" in navigator)) {
+      // `navigator` doesn't exist during SSR, so this can only be checked
+      // client-side in an effect — computing it during render would give a
+      // different result on the server (where the check can't run) than on
+      // the client, causing a hydration mismatch on browsers that lack
+      // geolocation support.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStatus("unsupported");
       return;
     }

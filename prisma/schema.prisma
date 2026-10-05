@@ -1,5 +1,8 @@
 generator client {
   provider = "prisma-client-js"
+  // native = maszyna budująca (CI/dev); debian-openssl-1.0.x = serwer produkcyjny AttHost
+  // (potwierdzone 2026-10-05: node_modules/.prisma/client/libquery_engine-debian-openssl-1.0.x.so.node na wex2)
+  binaryTargets = ["native", "debian-openssl-1.0.x"]
 }
 
 datasource db {

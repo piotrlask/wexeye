@@ -19,6 +19,7 @@ on:
         type: choice
         options:
           - staging
+          - production
 
 permissions:
   contents: read
@@ -79,6 +80,10 @@ jobs:
               echo "auth_url=https://wex3.piotrlask.atthost24.pl" >> "$GITHUB_OUTPUT"
               echo "base_url=https://wex3.piotrlask.atthost24.pl" >> "$GITHUB_OUTPUT"
               ;;
+            production)
+              echo "auth_url=https://wexeye.com" >> "$GITHUB_OUTPUT"
+              echo "base_url=https://wexeye.com" >> "$GITHUB_OUTPUT"
+              ;;
             *)
               echo "::error::unknown build target '${{ inputs.target }}'"
               exit 1
@@ -97,6 +102,10 @@ jobs:
           npm --version
 
       - name: npm ci
+        # Silniki Prisma CLI (schema-engine) również dla serwera produkcyjnego —
+        # artefakt zawiera własne narzędzie `prisma migrate deploy` (nie zależy od CLI na serwerze).
+        env:
+          PRISMA_CLI_BINARY_TARGETS: "debian-openssl-1.0.x,debian-openssl-3.0.x"
         run: npm ci --no-audit --no-fund
 
       - name: Verify tracked files unchanged after npm ci
@@ -126,15 +135,15 @@ jobs:
           NEXT_PUBLIC_BASE_URL: ${{ steps.target.outputs.base_url }}
         run: npm run build
 
-      - name: Verify staging public URL is bound in build output
+      - name: Verify target public URL is bound in build output
         run: |
           set -euo pipefail
           EXPECTED="${{ steps.target.outputs.base_url }}"
           if grep -rlF "$EXPECTED" .next/server >/dev/null 2>&1; then
-            echo "STAGING_PUBLIC_URL_BOUND=YES"
+            echo "TARGET_PUBLIC_URL_BOUND=YES"
           else
             echo "::error::expected public URL $EXPECTED not found in build output"
-            echo "STAGING_PUBLIC_URL_BOUND=NO"
+            echo "TARGET_PUBLIC_URL_BOUND=NO"
             exit 1
           fi
           if grep -rlF "http://localhost:3000" .next/server >/dev/null 2>&1; then
@@ -178,6 +187,18 @@ jobs:
           # server; not included in the standalone trace since it's not a
           # runtime import.
           cp -a prisma "$REL/prisma"
+          # Narzędzie migracji w artefakcie: CLI prisma + silniki (w tym debian-openssl-1.0.x dla serwera).
+          # Uruchamiane przez pipeline wdrożeniowy: node node_modules/prisma/build/index.js migrate deploy
+          mkdir -p "$REL/node_modules/@prisma"
+          cp -a node_modules/prisma "$REL/node_modules/prisma"
+          cp -a node_modules/@prisma/engines "$REL/node_modules/@prisma/engines"
+          cp -a node_modules/@prisma/engines-version "$REL/node_modules/@prisma/engines-version"
+          cp -a node_modules/@prisma/debug "$REL/node_modules/@prisma/debug" 2>/dev/null || true
+          cp -a node_modules/@prisma/fetch-engine "$REL/node_modules/@prisma/fetch-engine" 2>/dev/null || true
+          cp -a node_modules/@prisma/get-platform "$REL/node_modules/@prisma/get-platform" 2>/dev/null || true
+          # Silnik zapytań dla serwera musi być w artefakcie (binaryTargets w schema.prisma)
+          ls "$REL"/node_modules/.prisma/client/ | grep -q "debian-openssl-1.0.x" || { echo "::error::brak silnika debian-openssl-1.0.x w artefakcie"; exit 1; }
+          ls node_modules/@prisma/engines/ | grep -q "debian-openssl-1.0.x" || { echo "::error::brak schema-engine debian-openssl-1.0.x"; exit 1; }
           if [ -f .env.example ]; then cp .env.example "$REL/.env.example"; fi
 
           # Absolute exclusion of anything secret-bearing or upload-derived,
@@ -347,6 +368,8 @@ jobs:
           NPM_VERSION=$(npm --version)
           NEXT_VERSION=${{ steps.versions.outputs.next_version }}
           PRISMA_VERSION=${{ steps.versions.outputs.prisma_version }}
+          PRISMA_BINARY_TARGETS=native,debian-openssl-1.0.x
+          MIGRATE_TOOL=node node_modules/prisma/build/index.js migrate deploy
           BUILD_RESULT=PASS
           PUBLIC_BASE_URL=${{ steps.target.outputs.base_url }}
           PASSENGER_STARTUP_ENTRY=app.js

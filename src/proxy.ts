@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { getSafeRedirectPath } from "@/lib/redirect";
+import { SITE_URL } from "@/lib/site";
 
 // F-08 (ETAP 7.16): CSP with a per-request nonce. Next.js App Router injects
 // its own inline hydration <script> tags on every page, so a script-src that
@@ -38,7 +39,28 @@ function buildCspHeader(nonce: string): string {
 // runtime at all. Pure rename + runtime change, zero logic touched — same
 // migration Next.js's own `middleware-to-proxy` codemod performs, and the
 // same warning this project's build output has shown since ETAP 7.16.
+// P1-01: www alias → canonical origin (SITE_URL — apex host, https). Only
+// GET/HEAD are redirected (a cross-origin redirect of a form POST would drop
+// its body); any other host (localhost, previews) is left untouched.
+// HTTP→HTTPS is NOT decided here: behind Passenger the app always receives a
+// plain-HTTP connection and Next itself fills x-forwarded-proto=http when the
+// front server doesn't, so a scheme check here would loop every HTTPS request.
+// That redirect belongs to the web server (.htaccess, %{HTTPS}); HSTS likewise
+// waits until HTTPS-only traffic is confirmed in production.
+const CANONICAL = new URL(SITE_URL);
+
+function canonicalRedirect(req: NextRequest): NextResponse | null {
+  if (req.method !== "GET" && req.method !== "HEAD") return null;
+  const host = (req.headers.get("host") ?? "").trim().toLowerCase().replace(/:\d+$/, "");
+  if (host !== `www.${CANONICAL.hostname}`) return null;
+  const target = new URL(req.nextUrl.pathname + req.nextUrl.search, CANONICAL.origin);
+  return NextResponse.redirect(target, 301);
+}
+
 export default auth((req) => {
+  const canonical = canonicalRedirect(req);
+  if (canonical) return canonical;
+
   const { pathname } = req.nextUrl;
   const role = req.auth?.user?.role;
 

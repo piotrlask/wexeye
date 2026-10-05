@@ -159,6 +159,17 @@ export async function POST(req: NextRequest) {
       break;
     }
 
+    case "customer.subscription.updated": {
+      // Keeps the panel in sync when cancellation is scheduled or undone
+      // (from our panel or the Stripe dashboard).
+      const stripeSub = event.data.object as Stripe.Subscription;
+      await prisma.subscription.updateMany({
+        where: { stripeSubscriptionId: stripeSub.id },
+        data: { cancelAtPeriodEnd: Boolean(stripeSub.cancel_at_period_end) },
+      });
+      break;
+    }
+
     case "customer.subscription.deleted": {
       const stripeSub = event.data.object as Stripe.Subscription;
       const existing = await prisma.subscription.findUnique({

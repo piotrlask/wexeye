@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
-import { AD_PRICE_CENTS, AD_SLOTS_PER_AUTHOR } from "@/lib/constants";
+import { AD_PRICE_CENTS, AD_SLOTS_PER_AUTHOR, CURRENCY, PAYMENT_CONSENT_VERSION } from "@/lib/constants";
 import { getActiveAdsForAuthor } from "@/lib/ads";
 
 export async function POST(req: NextRequest) {
@@ -14,6 +14,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   const authorId = body?.authorId as string | undefined;
   const articleId = body?.articleId as string | undefined;
+  if (body?.consent !== true) {
+    return NextResponse.json({ error: "Zaznacz zgodę wymaganą przed płatnością." }, { status: 400 });
+  }
 
   if (!authorId) {
     return NextResponse.json({ error: "Brak authorId." }, { status: 400 });
@@ -60,7 +63,7 @@ export async function POST(req: NextRequest) {
     line_items: [
       {
         price_data: {
-          currency: "usd",
+          currency: CURRENCY,
           unit_amount: AD_PRICE_CENTS,
           product_data: { name: "Reklama na wexeye — 30 dni pod tekstami jednego autora" },
         },
@@ -69,7 +72,7 @@ export async function POST(req: NextRequest) {
     ],
     success_url: `${baseUrl}/reklama/${purchase.id}`,
     cancel_url: `${baseUrl}${cancelPath}?checkout=cancelled`,
-    metadata: { adPurchaseId: purchase.id },
+    metadata: { adPurchaseId: purchase.id, consentAt: new Date().toISOString(), consentVersion: PAYMENT_CONSENT_VERSION },
   });
 
   await prisma.adPurchase.update({

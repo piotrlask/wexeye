@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { auth, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isReader } from "@/lib/access";
+import { stripe } from "@/lib/stripe";
 import { CONTACT_EMAILS } from "@/lib/legal";
 import { MAX_DIRECT_REFERRALS, GENDERS } from "@/lib/constants";
 import { fitsVarchar, VARCHAR_191_MAX } from "@/lib/validation";
@@ -453,4 +454,35 @@ export async function deleteAccountAction(
   await signOut({ redirect: false });
 
   return { success: true };
+}
+
+export type CancelSubscriptionState = { ok?: boolean; error?: string };
+
+/**
+ * Self-service cancellation (P0-08, consumer law): the Stripe subscription is
+ * set to end at the current period's end — no further charges, access kept
+ * until then. Stripe's customer.subscription.deleted later marks it CANCELED.
+ */
+export async function cancelSubscriptionAction(
+  _prevState: CancelSubscriptionState | undefined,
+  formData: FormData
+): Promise<CancelSubscriptionState> {
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Musisz być zalogowany." };
+  if (formData.get("confirm") !== "on") return { error: "Potwierdź anulowanie subskrypcji." };
+
+  const subscription = await prisma.subscription.findUnique({ where: { userId: session.user.id } });
+  if (!subscription || subscription.status !== "ACTIVE" || !subscription.stripeSubscriptionId) {
+    return { error: "Nie masz aktywnej subskrypcji do anulowania." };
+  }
+  if (subscription.cancelAtPeriodEnd) return { ok: true };
+
+  try {
+    await stripe.subscriptions.update(subscription.stripeSubscriptionId, { cancel_at_period_end: true });
+  } catch {
+    return { error: `Nie udało się anulować subskrypcji. Spróbuj ponownie lub napisz na ${CONTACT_EMAILS.general}.` };
+  }
+  await prisma.subscription.update({ where: { userId: session.user.id }, data: { cancelAtPeriodEnd: true } });
+  revalidatePath("/panel");
+  return { ok: true };
 }

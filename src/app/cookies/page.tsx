@@ -13,7 +13,6 @@ export default function CookiesPage() {
   return (
     <LegalPage
       title="Informacja o plikach cookies"
-      interimNote="To jest wersja tymczasowa. Opisuje pliki cookies stosowane w Serwisie na dzień ostatniej aktualizacji."
     >
       <LegalSection title="1. Czym są pliki cookies">
         <Para>

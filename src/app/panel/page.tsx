@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { PRICING } from "@/lib/constants";
+import { formatPrice, PRICING } from "@/lib/constants";
+import CancelSubscriptionForm from "./CancelSubscriptionForm";
 import BecomeEditorForm from "./BecomeEditorForm";
 import CheckoutButtons from "@/components/CheckoutButtons";
 import ProfileForm from "./ProfileForm";
@@ -73,6 +74,9 @@ export default async function PanelPage({
       })
     : [];
 
+  const activeSubscription =
+    subscription && subscription.status === "ACTIVE" && subscription.currentPeriodEnd > new Date() ? subscription : null;
+
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="mb-6 text-2xl font-semibold">Twoje konto</h1>
@@ -125,18 +129,25 @@ export default async function PanelPage({
 
       <section className="mb-10">
         <h2 className="mb-3 text-lg font-semibold">Dostęp do treści</h2>
-        {subscription && subscription.status === "ACTIVE" && subscription.currentPeriodEnd > new Date() ? (
-          <p className="text-sm">
-            Aktywna subskrypcja: <strong>{TIER_LABELS[subscription.tier]}</strong>
-            {subscription.tier === "SUB20" && (
-              <> — wykorzystano {subscription.articlesUsedInPeriod}/20 artykułów w tym okresie.</>
+        {activeSubscription ? (
+          <>
+            <p className="text-sm">
+              Aktywna subskrypcja: <strong>{TIER_LABELS[activeSubscription.tier]}</strong>
+              {activeSubscription.tier === "SUB20" && (
+                <> — wykorzystano {activeSubscription.articlesUsedInPeriod}/20 artykułów w tym okresie.</>
+              )}{" "}
+              {activeSubscription.cancelAtPeriodEnd
+                ? `Anulowana — dostęp do ${activeSubscription.currentPeriodEnd.toLocaleDateString("pl-PL")}, bez kolejnych płatności.`
+                : `Odnowienie: ${activeSubscription.currentPeriodEnd.toLocaleDateString("pl-PL")}.`}
+            </p>
+            {!activeSubscription.cancelAtPeriodEnd && activeSubscription.stripeSubscriptionId && (
+              <CancelSubscriptionForm periodEnd={activeSubscription.currentPeriodEnd.toLocaleDateString("pl-PL")} />
             )}
-            {" "}Odnowienie: {subscription.currentPeriodEnd.toLocaleDateString("pl-PL")}.
-          </p>
+          </>
         ) : (
           <p className="text-sm text-black/60 dark:text-white/60">
             Brak aktywnej subskrypcji. Pojedyncze artykuły możesz kupić bezpośrednio na ich stronie za{" "}
-            {(PRICING.ARTICLE.amountCents / 100).toFixed(2)}$.
+            {formatPrice(PRICING.ARTICLE.amountCents)}.
           </p>
         )}
         <div className="mt-4">

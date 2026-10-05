@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { registerAction } from "./actions";
+import { MIN_AGE, MIN_AGE_WITH_PARENTAL_CONSENT } from "@/lib/legal";
 
 export default function RejestracjaForm() {
   const [state, formAction, pending] = useActionState(registerAction, undefined);
@@ -56,6 +57,34 @@ export default function RejestracjaForm() {
             autoComplete="new-password"
             className="rounded border border-black/20 px-3 py-2 dark:border-white/20"
           />
+        </label>
+        <fieldset className="flex flex-col gap-2 text-sm">
+          <legend className="mb-1">Wiek</legend>
+          <label className="flex items-start gap-2">
+            <input type="radio" name="ageConfirmation" value="18_PLUS" required className="mt-1" />
+            <span>Mam ukończone {MIN_AGE} lat.</span>
+          </label>
+          <label className="flex items-start gap-2">
+            <input type="radio" name="ageConfirmation" value="16_PARENTAL" className="mt-1" />
+            <span>
+              Mam ukończone {MIN_AGE_WITH_PARENTAL_CONSENT} lat i mam zgodę rodzica lub opiekuna prawnego na założenie
+              konta.
+            </span>
+          </label>
+        </fieldset>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" name="acceptTerms" required className="mt-1" />
+          <span>
+            Akceptuję{" "}
+            <Link href="/regulamin" className="underline" target="_blank">
+              Regulamin
+            </Link>{" "}
+            i zapoznałem/zapoznałam się z{" "}
+            <Link href="/prywatnosc" className="underline" target="_blank">
+              Polityką prywatności
+            </Link>
+            .
+          </span>
         </label>
         {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
         <button

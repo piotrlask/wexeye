@@ -22,8 +22,24 @@ export const CONTACT_EMAILS = {
   safety: "safety@wexeye.com",
 } as const;
 
+// Hosting / database / file storage / backups provider (verified 2026-10-05:
+// atthost.pl is a netart.com brand; server IP in a Polish NetArt network).
+export const HOSTING_PROVIDER = {
+  name: "netart.com sp. z o.o.",
+  address: "ul. Pana Tadeusza 2, 30-727 Kraków",
+  krs: "0001000590",
+  location: "Polska",
+} as const;
+
+// Age rule decided by the operator (2026-10-05): 18+, or 16–17 with the
+// consent of a parent or legal guardian.
+export const MIN_AGE = 18;
+export const MIN_AGE_WITH_PARENTAL_CONSENT = 16;
+export const AGE_CONFIRMATIONS = ["18_PLUS", "16_PARENTAL"] as const;
+export type AgeConfirmation = (typeof AGE_CONFIRMATIONS)[number];
+
 // Date of the last edit to the interim legal pages (shown as-is to visitors).
-export const LEGAL_LAST_UPDATED = "19 września 2026";
+export const LEGAL_LAST_UPDATED = "6 października 2026";
 
 /**
  * mailto: link with an optional generic-category subject. Only ever built from

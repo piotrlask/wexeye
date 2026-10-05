@@ -1,19 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalPage, LegalSection, Para, Bullets, MailLink } from "@/components/LegalPage";
-import { OPERATOR, CONTACT_EMAILS } from "@/lib/legal";
+import { OPERATOR, CONTACT_EMAILS, HOSTING_PROVIDER, MIN_AGE, MIN_AGE_WITH_PARENTAL_CONSENT } from "@/lib/legal";
 
 export const metadata: Metadata = {
-  title: "Polityka prywatności WexEye — wersja tymczasowa",
+  title: "Polityka prywatności WexEye",
   description:
-    "Tymczasowa polityka prywatności serwisu WexEye: administrator danych (APIL Sp. z o.o.), kategorie danych, odbiorcy, prawa użytkownika i skutki usunięcia konta.",
+    "Polityka prywatności serwisu WexEye: administrator danych (APIL Sp. z o.o.), kategorie danych, odbiorcy, prawa użytkownika i skutki usunięcia konta.",
 };
 
 export default function PrywatnoscPage() {
   return (
     <LegalPage
-      title="Polityka prywatności WexEye — wersja tymczasowa"
-      interimNote="To jest wersja tymczasowa. Opisuje dane faktycznie przetwarzane w Serwisie na dzień ostatniej aktualizacji i będzie uzupełniana, w szczególności o szczegóły dotyczące infrastruktury, lokalizacji przetwarzania i okresów przechowywania."
+      title="Polityka prywatności WexEye"
     >
       <LegalSection title="1. Administrator danych">
         <address className="mb-3 text-sm not-italic leading-relaxed">
@@ -36,8 +35,8 @@ export default function PrywatnoscPage() {
       <LegalSection title="2. Jakie dane przetwarzamy i w jakim celu">
         <h3 className="mb-1 text-sm font-semibold">Dane konta</h3>
         <Para>
-          Adres e-mail, imię i nazwisko (nazwa wyświetlana), rola konta, identyfikatory techniczne, kod polecający oraz
-          data założenia konta. Cel: założenie i prowadzenie konta, logowanie, komunikacja związana z kontem.
+          Adres e-mail, imię i nazwisko (nazwa wyświetlana), rola konta, identyfikatory techniczne, kod polecający,
+          data założenia konta, data akceptacji Regulaminu oraz oświadczenie o wieku. Cel: założenie i prowadzenie konta, logowanie, komunikacja związana z kontem.
         </Para>
         <h3 className="mb-1 text-sm font-semibold">Dane profilu</h3>
         <Para>
@@ -127,8 +126,8 @@ export default function PrywatnoscPage() {
             adres e-mail, imię i nazwisko oraz dane potrzebne do realizacji zakupu.
           </li>
           <li>
-            <strong>Resend</strong> — wysyłka wiadomości e-mail dotyczących konta (np. reset hasła). Dostawca
-            przetwarza adres e-mail odbiorcy i treść wiadomości.
+            <strong>Resend</strong> — wysyłka wiadomości e-mail dotyczących konta (np. reset hasła), z wysyłką
+            realizowaną w regionie Unii Europejskiej. Dostawca przetwarza adres e-mail odbiorcy i treść wiadomości.
           </li>
           <li>
             <strong>OpenStreetMap (dostawca kafelków mapy)</strong> — wyświetlanie mapy powoduje, że przeglądarka
@@ -136,8 +135,8 @@ export default function PrywatnoscPage() {
             wyświetlanym obszarze.
           </li>
           <li>
-            <strong>Dostawcy infrastruktury</strong> — hosting, baza danych, przechowywanie plików i kopie zapasowe.
-            Dostawcy ci nie są tu jeszcze wskazani; informacja zostanie uzupełniona.
+            <strong>{HOSTING_PROVIDER.name}</strong> ({HOSTING_PROVIDER.address}, KRS {HOSTING_PROVIDER.krs}) — hosting
+            Serwisu, baza danych, przechowywanie plików i kopie zapasowe. Serwery znajdują się w Polsce.
           </li>
           <li>Organy publiczne — gdy obowiązek udostępnienia danych wynika z przepisów prawa.</li>
         </Bullets>
@@ -146,17 +145,32 @@ export default function PrywatnoscPage() {
 
       <LegalSection title="5. Przekazywanie danych poza Europejski Obszar Gospodarczy">
         <Para>
-          Niektórzy z powyższych dostawców mogą przetwarzać dane poza Europejskim Obszarem Gospodarczym. Informacje o
-          lokalizacji przetwarzania i zastosowanych zabezpieczeniach prawnych zostaną uzupełnione po zakończeniu
-          weryfikacji infrastruktury i usług zewnętrznych.
+          Hosting, baza danych, pliki i kopie zapasowe Serwisu znajdują się w Polsce. Stripe i Resend są częścią grup
+          z siedzibą w Stanach Zjednoczonych i mogą przekazywać dane poza Europejski Obszar Gospodarczy — na podstawie
+          decyzji Komisji Europejskiej stwierdzającej odpowiedni stopień ochrony (EU-US Data Privacy Framework) lub
+          standardowych klauzul umownych, zgodnie z dokumentacją tych dostawców. Serwery kafelków mapy OpenStreetMap
+          znajdują się m.in. w Wielkiej Brytanii, wobec której obowiązuje decyzja stwierdzająca odpowiedni stopień
+          ochrony.
         </Para>
       </LegalSection>
 
       <LegalSection title="6. Okres przechowywania">
         <Para>
-          Okresy przechowywania zależą od rodzaju danych, celu przetwarzania, względów bezpieczeństwa, rozliczeń oraz
-          wymogów prawnych. Szczegółowe okresy nie zostały jeszcze określone w tej wersji polityki.
+          Dane przechowujemy tylko tak długo, jak to potrzebne do danego celu:
         </Para>
+        <Bullets>
+          <li>dane konta i profilu — do usunięcia konta; po usunięciu są niezwłocznie anonimizowane (patrz pkt 8),</li>
+          <li>
+            dane transakcyjne i rozliczeniowe — przez okres wymagany przepisami podatkowymi i o rachunkowości (co do
+            zasady 5 lat od końca roku, w którym nastąpiła transakcja),
+          </li>
+          <li>zapisy prób logowania i innych chronionych operacji — około 1 godziny,</li>
+          <li>tokeny resetu hasła — ważne 1 godzinę, jednorazowe,</li>
+          <li>sesja logowania — do wylogowania, nie dłużej niż 30 dni,</li>
+          <li>dzienniki błędów serwera (bez treści żądań) — 30 dni,</li>
+          <li>kopie zapasowe — do 30 dni,</li>
+          <li>znajomości i powiadomienia — do usunięcia przez użytkownika lub usunięcia konta.</li>
+        </Bullets>
       </LegalSection>
 
       <LegalSection title="7. Prawa użytkownika">
@@ -213,7 +227,9 @@ export default function PrywatnoscPage() {
 
       <LegalSection title="10. Wiek użytkowników">
         <Para>
-          Zasady dotyczące wieku użytkowników są obecnie aktualizowane. Jeżeli uważasz, że w Serwisie znajdują się dane
+          Konto może założyć osoba, która ukończyła {MIN_AGE} lat, albo osoba, która ukończyła{" "}
+          {MIN_AGE_WITH_PARENTAL_CONSENT} lat i ma zgodę rodzica lub opiekuna prawnego; przy rejestracji zapisujemy datę
+          akceptacji Regulaminu i rodzaj złożonego oświadczenia o wieku. Jeżeli uważasz, że w Serwisie znajdują się dane
           osoby, która nie powinna z niego korzystać, napisz na adres <MailLink email={CONTACT_EMAILS.privacy} />.
         </Para>
       </LegalSection>

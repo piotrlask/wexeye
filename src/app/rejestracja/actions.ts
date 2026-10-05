@@ -7,6 +7,7 @@ import { AuthError } from "next-auth";
 import { getClientIp, checkRegisterRateLimit, recordRegisterAttempt } from "@/lib/rateLimit";
 import { isValidEmail } from "@/lib/email";
 import { fitsVarchar, VARCHAR_191_MAX } from "@/lib/validation";
+import { AGE_CONFIRMATIONS, type AgeConfirmation } from "@/lib/legal";
 
 // Same neutral copy used below for "an account already exists" — extracted
 // so the P2002 race-condition branch (two concurrent registrations for the
@@ -54,6 +55,16 @@ export async function registerAction(
     return { error: "Hasła nie są identyczne." };
   }
 
+  // P0-08: age declaration (18+, or 16–17 with a parent's/guardian's consent)
+  // and acceptance of the Terms are required; both are recorded on the account.
+  const ageConfirmation = String(formData.get("ageConfirmation") ?? "");
+  if (!AGE_CONFIRMATIONS.includes(ageConfirmation as AgeConfirmation)) {
+    return { error: "Potwierdź swój wiek: konto mogą założyć osoby pełnoletnie albo osoby od 16 lat za zgodą rodzica lub opiekuna." };
+  }
+  if (formData.get("acceptTerms") !== "on") {
+    return { error: "Aby założyć konto, zaakceptuj Regulamin." };
+  }
+
   // Neutral response on purpose: a direct "this email already has an
   // account" message lets anyone enumerate registered addresses. We still
   // can't fully hide the difference (a genuinely new email logs the visitor
@@ -69,7 +80,7 @@ export async function registerAction(
   // a separate, free upgrade offered from the reader's own account panel.
   try {
     await prisma.user.create({
-      data: { name, email, passwordHash, role: "READER" },
+      data: { name, email, passwordHash, role: "READER", termsAcceptedAt: new Date(), ageConfirmation },
     });
   } catch (err) {
     // ETAP 13.3C.4F.1: the pre-check above has a race window — two concurrent

@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
 import { hasArticleAccess, hasStaffAccess } from "@/lib/access";
-import { PRICING, PURCHASE_TYPES, type PurchaseType } from "@/lib/constants";
+import { CURRENCY, PAYMENT_CONSENT_VERSION, PRICING, PURCHASE_TYPES, type PurchaseType } from "@/lib/constants";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -17,6 +17,9 @@ export async function POST(req: NextRequest) {
 
   if (!type || !PURCHASE_TYPES.includes(type)) {
     return NextResponse.json({ error: "Nieprawidłowy typ zakupu." }, { status: 400 });
+  }
+  if (body?.consent !== true) {
+    return NextResponse.json({ error: "Zaznacz zgodę wymaganą przed płatnością." }, { status: 400 });
   }
   if (type === "ARTICLE" && !articleId) {
     return NextResponse.json({ error: "Brak articleId." }, { status: 400 });
@@ -58,7 +61,7 @@ export async function POST(req: NextRequest) {
     line_items: [
       {
         price_data: {
-          currency: "usd",
+          currency: CURRENCY,
           unit_amount: pricing.amountCents,
           product_data: { name: pricing.label },
           ...(type === "ARTICLE" ? {} : { recurring: { interval: "month" as const } }),
@@ -68,7 +71,14 @@ export async function POST(req: NextRequest) {
     ],
     success_url: `${baseUrl}${returnPath}?checkout=success`,
     cancel_url: `${baseUrl}${returnPath}?checkout=cancelled`,
-    metadata: { userId: user.id, type, ...(articleId ? { articleId } : {}) },
+    metadata: {
+      userId: user.id,
+      type,
+      ...(articleId ? { articleId } : {}),
+      // Evidence of the consumer consent given on our page right before checkout.
+      consentAt: new Date().toISOString(),
+      consentVersion: PAYMENT_CONSENT_VERSION,
+    },
   });
 
   return NextResponse.json({ url: checkoutSession.url });

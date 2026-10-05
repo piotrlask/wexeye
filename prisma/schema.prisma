@@ -45,6 +45,11 @@ model User {
   // hasStaffAccess) must check this is null. This is the single source of
   // truth for "deleted" — never inferred from the anonymized email pattern.
   deletedAt        DateTime?
+  // Consent captured at registration (P0-08): when the Terms were accepted and
+  // which age declaration was made ("18_PLUS" or "16_PARENTAL" — 16/17 with a
+  // parent's/guardian's consent). Null for accounts created before this.
+  termsAcceptedAt  DateTime?
+  ageConfirmation  String?
   name             String
   role             String    @default("READER")
   referralCode     String    @unique @default(cuid())
@@ -246,6 +251,9 @@ model Subscription {
   currentPeriodStart   DateTime  @default(now())
   currentPeriodEnd     DateTime
   articlesUsedInPeriod Int       @default(0)
+  // Set when the user cancels in the panel: Stripe keeps the subscription
+  // until currentPeriodEnd, then customer.subscription.deleted marks it CANCELED.
+  cancelAtPeriodEnd    Boolean   @default(false)
   createdAt            DateTime  @default(now())
 }
 

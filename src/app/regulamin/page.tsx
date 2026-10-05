@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalPage, LegalSection, Para, Bullets, MailLink } from "@/components/LegalPage";
-import { OPERATOR, CONTACT_EMAILS } from "@/lib/legal";
+import { AD_DURATION_DAYS, AD_PRICE_CENTS, formatPrice, PRICING } from "@/lib/constants";
+import { OPERATOR, CONTACT_EMAILS, MIN_AGE, MIN_AGE_WITH_PARENTAL_CONSENT } from "@/lib/legal";
 
 export const metadata: Metadata = {
-  title: "Regulamin WexEye — wersja tymczasowa",
+  title: "Regulamin WexEye",
   description:
-    "Tymczasowy regulamin serwisu WexEye prowadzonego przez APIL Sp. z o.o.: konta, treści użytkowników, treści zabronione, moderacja, płatności i usuwanie konta.",
+    "Regulamin serwisu WexEye prowadzonego przez APIL Sp. z o.o.: konta, treści użytkowników, treści zabronione, moderacja, płatności i usuwanie konta.",
 };
 
 export default function RegulaminPage() {
   return (
     <LegalPage
-      title="Regulamin WexEye — wersja tymczasowa"
-      interimNote="To jest wersja tymczasowa regulaminu. Będzie uzupełniana i aktualizowana. Aktualna wersja i data ostatniej zmiany są zawsze podane na tej stronie."
+      title="Regulamin WexEye"
     >
       <LegalSection title="1. Operator i postanowienia ogólne">
         <Para>
@@ -53,8 +53,10 @@ export default function RegulaminPage() {
           </li>
         </Bullets>
         <Para>
-          Korzystanie z WexEye podlega wymaganiom wieku określonym dla danej usługi i właściwego prawa. Szczegółowe
-          zasady wieku są obecnie aktualizowane.
+          Konto może założyć osoba, która ukończyła {MIN_AGE} lat, albo osoba, która ukończyła{" "}
+          {MIN_AGE_WITH_PARENTAL_CONSENT} lat i ma zgodę rodzica lub opiekuna prawnego. Przy rejestracji użytkownik
+          potwierdza swój wiek oraz akceptuje Regulamin; Operator zapisuje datę akceptacji i rodzaj złożonego
+          oświadczenia o wieku. Operator może zablokować konto, jeżeli oświadczenie okaże się nieprawdziwe.
         </Para>
       </LegalSection>
 
@@ -143,16 +145,45 @@ export default function RegulaminPage() {
         </Para>
       </LegalSection>
 
-      <LegalSection title="10. Płatności, subskrypcje i reklamy">
+      <LegalSection id="platnosci" title="10. Płatności, subskrypcje i reklamy">
+        <Para>W Serwisie dostępne są następujące płatne usługi (ceny brutto):</Para>
+        <Bullets>
+          <li>
+            {PRICING.ARTICLE.label} — {formatPrice(PRICING.ARTICLE.amountCents)} jednorazowo; stały dostęp do wybranego
+            artykułu na koncie kupującego,
+          </li>
+          <li>
+            {PRICING.SUB20.label} — {formatPrice(PRICING.SUB20.amountCents)} miesięcznie,
+          </li>
+          <li>
+            {PRICING.SUB30.label} — {formatPrice(PRICING.SUB30.amountCents)} miesięcznie,
+          </li>
+          <li>
+            reklama pod publikacjami wybranego autora — {formatPrice(AD_PRICE_CENTS)} za {AD_DURATION_DAYS} dni emisji.
+          </li>
+        </Bullets>
         <Para>
-          W Serwisie mogą występować płatne treści, subskrypcje oraz reklamy. Płatności są obsługiwane za pośrednictwem
-          zewnętrznego operatora płatności. Reklamy polityczne są zabronione.
+          Płatności obsługuje operator płatności Stripe; dane karty są podawane wyłącznie na stronie operatora i nie są
+          przetwarzane przez WexEye. Umowa zostaje zawarta z chwilą potwierdzenia płatności.
         </Para>
         <Para>
-          Szczegółowe warunki transakcji oraz prawa konsumenta zależą od rodzaju produktu i właściwego prawa oraz są
-          przedstawiane w procesie zakupu. Niniejszy regulamin nie zawiera jeszcze odrębnego opisu zasad zwrotów,
-          anulowania subskrypcji i odstąpienia od umowy i nie ogranicza bezwzględnie obowiązujących praw konsumenta.
-          W sprawach dotyczących płatności można pisać na adres <MailLink email={CONTACT_EMAILS.general} />.
+          Subskrypcja odnawia się automatycznie co miesiąc i jest pobierana z góry za kolejny okres. Użytkownik może ją w
+          każdej chwili anulować w panelu konta („Anuluj subskrypcję”): dostęp pozostaje do końca opłaconego okresu, a
+          kolejne płatności nie są pobierane. Niewykorzystany limit artykułów nie przechodzi na kolejny okres.
+        </Para>
+        <Para>
+          Konsumentowi przysługuje co do zasady prawo odstąpienia od umowy zawartej na odległość w terminie 14 dni.
+          Przed płatnością użytkownik może zażądać natychmiastowego udostępnienia treści cyfrowej lub rozpoczęcia usługi
+          i przyjąć do wiadomości, że z tą chwilą traci prawo odstąpienia od umowy — bez tej zgody płatność nie jest
+          możliwa, ponieważ treść i usługa są udostępniane natychmiast. Prawa z tytułu niezgodności treści cyfrowej lub
+          usługi z umową oraz inne bezwzględnie obowiązujące prawa konsumenta nie są w ten sposób ograniczane.
+        </Para>
+        <Para>
+          Reklamacje dotyczące płatności i usług płatnych można składać na adres{" "}
+          <MailLink email={CONTACT_EMAILS.general} />, podając adres e-mail konta oraz opis problemu. Operator odpowiada
+          na reklamację w terminie 14 dni. W razie uwzględnienia reklamacji (np. gdy płatna treść lub usługa nie została
+          udostępniona) Operator przywraca dostęp albo zwraca płatność tą samą metodą, którą ją dokonano. Reklamy
+          polityczne są zabronione.
         </Para>
       </LegalSection>
 

@@ -90,6 +90,21 @@ export type PurchaseStatus = (typeof PURCHASE_STATUSES)[number];
 export const SUBSCRIPTION_STATUSES = ["ACTIVE", "CANCELED", "PAST_DUE"] as const;
 export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
 
+// Charge currency for every Stripe Checkout session (ISO 4217, lower-case as
+// Stripe expects). Single place to change it; prices below are in its minor unit.
+export const CURRENCY = "usd";
+
+export function formatPrice(minorUnits: number): string {
+  return new Intl.NumberFormat("pl-PL", { style: "currency", currency: CURRENCY.toUpperCase() }).format(minorUnits / 100);
+}
+
+// Consumer-law consent shown before any payment (P0-08): immediate access to
+// digital content / start of the service before the 14-day withdrawal period
+// ends, with acknowledgement that the right of withdrawal is then lost.
+export const PAYMENT_CONSENT_TEXT =
+  "Akceptuję Regulamin, żądam udostępnienia treści cyfrowej lub rozpoczęcia usługi przed upływem 14-dniowego terminu do odstąpienia od umowy i przyjmuję do wiadomości, że z chwilą udostępnienia treści lub rozpoczęcia usługi tracę prawo odstąpienia od umowy.";
+export const PAYMENT_CONSENT_VERSION = "2026-10-06";
+
 export const PRICING = {
   ARTICLE: { label: "Pojedynczy artykuł", amountCents: 200, articlesPerPeriod: 1 },
   SUB20: { label: "Subskrypcja — 20 artykułów/mies.", amountCents: 2000, articlesPerPeriod: 20 },

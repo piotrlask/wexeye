@@ -22,12 +22,13 @@ export const CONTACT_EMAILS = {
   safety: "safety@wexeye.com",
 } as const;
 
-// Hosting / database / file storage / backups provider (verified 2026-10-05:
-// atthost.pl is a netart.com brand; server IP in a Polish NetArt network).
+// Hosting / database / file storage / backups provider — the processor named in
+// the data processing agreement concluded in the AttHost customer panel on
+// 2026-10-06 (servers in a Polish network; atthost.pl is a NetArt Group brand).
 export const HOSTING_PROVIDER = {
-  name: "netart.com sp. z o.o.",
+  name: "AttHost sp. z o.o.",
   address: "ul. Pana Tadeusza 2, 30-727 Kraków",
-  krs: "0001000590",
+  krs: "0000531899",
   location: "Polska",
 } as const;
 

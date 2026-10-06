@@ -122,15 +122,17 @@ export default function PrywatnoscPage() {
       <LegalSection title="4. Odbiorcy danych i usługi zewnętrzne">
         <Bullets>
           <li>
-            <strong>Stripe</strong> — obsługa płatności i subskrypcji. Do operatora płatności przekazywane są m.in.
-            adres e-mail, imię i nazwisko oraz dane potrzebne do realizacji zakupu.
+            <strong>Stripe</strong> (Stripe, LLC i spółki z grupy Stripe) — obsługa płatności i subskrypcji. Do
+            operatora płatności przekazywane są m.in. adres e-mail, imię i nazwisko oraz dane potrzebne do realizacji
+            zakupu.
           </li>
           <li>
-            <strong>Resend</strong> — wysyłka wiadomości e-mail dotyczących konta (np. reset hasła), z wysyłką
-            realizowaną w regionie Unii Europejskiej. Dostawca przetwarza adres e-mail odbiorcy i treść wiadomości.
+            <strong>Resend</strong> (Plus Five Five, Inc., USA) — wysyłka wiadomości e-mail dotyczących konta (np.
+            reset hasła). Dostawca przetwarza adres e-mail odbiorcy i treść wiadomości.
           </li>
           <li>
-            <strong>OpenStreetMap (dostawca kafelków mapy)</strong> — wyświetlanie mapy powoduje, że przeglądarka
+            <strong>OpenStreetMap Foundation (Wielka Brytania) — dostawca kafelków mapy</strong> — wyświetlanie mapy
+            powoduje, że przeglądarka
             użytkownika łączy się z serwerami kafelków mapy, którym przekazywany jest m.in. adres IP i informacja o
             wyświetlanym obszarze.
           </li>
@@ -145,32 +147,36 @@ export default function PrywatnoscPage() {
 
       <LegalSection title="5. Przekazywanie danych poza Europejski Obszar Gospodarczy">
         <Para>
-          Hosting, baza danych, pliki i kopie zapasowe Serwisu znajdują się w Polsce. Stripe i Resend są częścią grup
-          z siedzibą w Stanach Zjednoczonych i mogą przekazywać dane poza Europejski Obszar Gospodarczy — na podstawie
-          decyzji Komisji Europejskiej stwierdzającej odpowiedni stopień ochrony (EU-US Data Privacy Framework) lub
-          standardowych klauzul umownych, zgodnie z dokumentacją tych dostawców. Serwery kafelków mapy OpenStreetMap
-          znajdują się m.in. w Wielkiej Brytanii, wobec której obowiązuje decyzja stwierdzająca odpowiedni stopień
-          ochrony.
+          Hosting, baza danych, pliki i kopie zapasowe Serwisu znajdują się w Polsce. Stripe i Resend przekazują dane
+          do Stanów Zjednoczonych; podstawą są standardowe klauzule umowne zatwierdzone przez Komisję Europejską oraz
+          udział tych dostawców w programie EU-U.S. Data Privacy Framework (zgodnie z ich aktualną polityką prywatności
+          i umową powierzenia przetwarzania danych). Mapa korzysta z serwerów OpenStreetMap Foundation z siedzibą w
+          Wielkiej Brytanii, wobec której obowiązuje decyzja Komisji Europejskiej stwierdzająca odpowiedni stopień
+          ochrony danych.
         </Para>
       </LegalSection>
 
       <LegalSection title="6. Okres przechowywania">
         <Para>
-          Dane przechowujemy tylko tak długo, jak to potrzebne do danego celu:
+          Okresy przechowywania zależą od rodzaju danych i celu przetwarzania:
         </Para>
         <Bullets>
-          <li>dane konta i profilu — do usunięcia konta; po usunięciu są niezwłocznie anonimizowane (patrz pkt 8),</li>
+          <li>dane konta i profilu — do usunięcia konta; przy usunięciu są anonimizowane (patrz pkt 8),</li>
+          <li>znajomości, zaproszenia i własne powiadomienia — do usunięcia konta,</li>
           <li>
-            dane transakcyjne i rozliczeniowe — przez okres wymagany przepisami podatkowymi i o rachunkowości (co do
-            zasady 5 lat od końca roku, w którym nastąpiła transakcja),
+            dane transakcyjne i rozliczeniowe — przez okres wymagany przepisami podatkowymi i o rachunkowości,
           </li>
-          <li>zapisy prób logowania i innych chronionych operacji — około 1 godziny,</li>
-          <li>tokeny resetu hasła — ważne 1 godzinę, jednorazowe,</li>
+          <li>
+            zapisy prób logowania i innych chronionych operacji — usuwane automatycznie po upływie około 1 godziny,
+          </li>
+          <li>link do resetu hasła — ważny 1 godzinę i jednorazowy,</li>
           <li>sesja logowania — do wylogowania, nie dłużej niż 30 dni,</li>
-          <li>dzienniki błędów serwera (bez treści żądań) — 30 dni,</li>
-          <li>kopie zapasowe — do 30 dni,</li>
-          <li>znajomości i powiadomienia — do usunięcia przez użytkownika lub usunięcia konta.</li>
+          <li>dzienniki błędów serwera (bez treści żądań, adresy e-mail ukryte) — 30 dni.</li>
         </Bullets>
+        <Para>
+          Kopie zapasowe bazy danych i plików są tworzone przed aktualizacjami Serwisu i przechowywane na serwerze w
+          Polsce.
+        </Para>
       </LegalSection>
 
       <LegalSection title="7. Prawa użytkownika">

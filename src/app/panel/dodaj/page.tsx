@@ -1,3 +1,4 @@
+import { formatPrice } from "@/lib/constants";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -121,10 +122,10 @@ async function TeamTab({ userId }: { userId: string }) {
     <>
       <section className="mb-8 rounded-lg border border-black/10 p-4 text-sm dark:border-white/10">
         <p>
-          Zarobki z prowizji: <strong>{(totalEarnedCents / 100).toFixed(2)}$</strong>
+          Zarobki z prowizji: <strong>{formatPrice(totalEarnedCents)}</strong>
         </p>
         <p className="mt-1">
-          Zarobki z reklam: <strong>{(totalAdEarnedCents / 100).toFixed(2)}$</strong>
+          Zarobki z reklam: <strong>{formatPrice(totalAdEarnedCents)}</strong>
         </p>
         <p className="mt-1 text-black/60 dark:text-white/60">
           Twój kod polecający:{" "}

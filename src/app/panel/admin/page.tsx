@@ -1,3 +1,4 @@
+import { formatPrice } from "@/lib/constants";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -201,10 +202,10 @@ async function ManagementTab() {
               <span className="text-black/60 dark:text-white/60">
                 {ROLE_LABELS[u.role] ?? u.role}
                 {(u.role === "EDITOR" || u.role === "ADMIN") && (
-                  <> · {((commissionByEditorId.get(u.id) ?? 0) / 100).toFixed(2)}$ prowizji</>
+                  <> · {formatPrice(commissionByEditorId.get(u.id) ?? 0)} prowizji</>
                 )}
                 {(adEarningsByUserId.get(u.id) ?? 0) > 0 && (
-                  <> · {((adEarningsByUserId.get(u.id) ?? 0) / 100).toFixed(2)}$ z reklam</>
+                  <> · {formatPrice(adEarningsByUserId.get(u.id) ?? 0)} z reklam</>
                 )}
               </span>
             </li>
@@ -215,18 +216,18 @@ async function ManagementTab() {
       <section>
         <h2 className="mb-4 text-lg font-semibold">Przychody</h2>
         <p className="text-sm">
-          Łączny przychód od czytelników: <strong>{(totalRevenueCents / 100).toFixed(2)}$</strong>
+          Łączny przychód od czytelników: <strong>{formatPrice(totalRevenueCents)}</strong>
         </p>
         <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-          Wypłacone prowizje redaktorom: {(totalCommissionsCents / 100).toFixed(2)}$ · pozostaje firmie:{" "}
-          {((totalRevenueCents - totalCommissionsCents) / 100).toFixed(2)}$
+          Wypłacone prowizje redaktorom: {formatPrice(totalCommissionsCents)} · pozostaje firmie:{" "}
+          {formatPrice(totalRevenueCents - totalCommissionsCents)}
         </p>
       </section>
 
       <section>
         <h2 className="mb-4 text-lg font-semibold">Reklamy</h2>
         <p className="mb-4 text-sm">
-          Łączny przychód z reklam: <strong>{(totalAdRevenueCents / 100).toFixed(2)}$</strong>
+          Łączny przychód z reklam: <strong>{formatPrice(totalAdRevenueCents)}</strong>
         </p>
         {activeAds.length === 0 ? (
           <p className="text-sm text-black/60 dark:text-white/60">Brak aktywnych reklam.</p>

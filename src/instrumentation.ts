@@ -25,22 +25,25 @@ export async function onRequestError(error: unknown, request: RequestInfo, conte
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   try {
     const { appendFile, mkdir, readdir, stat, unlink } = await import("node:fs/promises");
-    const { homedir } = await import("node:os");
+    const { homedir, tmpdir } = await import("node:os");
     const { join } = await import("node:path");
+    // Runtime-only paths: every fs call below is marked turbopackIgnore so the
+    // build's output file tracing does not treat them as "any file in the
+    // project" (which would copy docs, local DB and seeds into the release).
     const dir =
       process.env.APP_LOG_DIR?.trim() ||
-      (process.env.NODE_ENV === "production" ? join(homedir(), "wexeye-data", "logs") : join(process.cwd(), ".logs"));
-    await mkdir(dir, { recursive: true, mode: 0o700 });
+      (process.env.NODE_ENV === "production" ? join(homedir(), "wexeye-data", "logs") : join(tmpdir(), "wexeye-dev-logs"));
+    await mkdir(/* turbopackIgnore: true */ dir, { recursive: true, mode: 0o700 });
     const now = new Date();
     const file = join(dir, `app-errors-${now.toISOString().slice(0, 10)}.log`);
-    const size = await stat(file).then((s) => s.size).catch(() => 0);
+    const size = await stat(/* turbopackIgnore: true */ file).then((s) => s.size).catch(() => 0);
     if (size > MAX_FILE_BYTES) return;
     if (size === 0) {
       // First entry of the day: drop daily files older than the retention period.
       const cutoff = new Date(now.getTime() - RETENTION_DAYS * 86_400_000).toISOString().slice(0, 10);
-      for (const name of await readdir(dir).catch(() => [] as string[])) {
+      for (const name of await readdir(/* turbopackIgnore: true */ dir).catch(() => [] as string[])) {
         const m = /^app-errors-(\d{4}-\d{2}-\d{2})\.log$/.exec(name);
-        if (m && m[1] < cutoff) await unlink(join(dir, name)).catch(() => undefined);
+        if (m && m[1] < cutoff) await unlink(/* turbopackIgnore: true */ join(dir, name)).catch(() => undefined);
       }
     }
     const err = error instanceof Error ? error : new Error(String(error));
@@ -55,7 +58,7 @@ export async function onRequestError(error: unknown, request: RequestInfo, conte
       name: err.name,
       message: redactLogText(err.message ?? ""),
     };
-    await appendFile(file, `${JSON.stringify(line)}\n`, { encoding: "utf8", mode: 0o600 });
+    await appendFile(/* turbopackIgnore: true */ file, `${JSON.stringify(line)}\n`, { encoding: "utf8", mode: 0o600 });
   } catch {
     // Logging must never break request handling.
   }

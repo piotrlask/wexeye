@@ -92,7 +92,8 @@ export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
 
 // Charge currency for every Stripe Checkout session (ISO 4217, lower-case as
 // Stripe expects). Single place to change it; prices below are in its minor unit.
-export const CURRENCY = "usd";
+// Operator decision 2026-10-06: PLN. Amounts below are integer grosze (1 PLN = 100).
+export const CURRENCY = "pln";
 
 export function formatPrice(minorUnits: number): string {
   return new Intl.NumberFormat("pl-PL", { style: "currency", currency: CURRENCY.toUpperCase() }).format(minorUnits / 100);
@@ -106,9 +107,9 @@ export const PAYMENT_CONSENT_TEXT =
 export const PAYMENT_CONSENT_VERSION = "2026-10-06";
 
 export const PRICING = {
-  ARTICLE: { label: "Pojedynczy artykuł", amountCents: 200, articlesPerPeriod: 1 },
-  SUB20: { label: "Subskrypcja — 20 artykułów/mies.", amountCents: 2000, articlesPerPeriod: 20 },
-  SUB30: { label: "Subskrypcja — bez limitu", amountCents: 3000, articlesPerPeriod: Infinity },
+  ARTICLE: { label: "Pojedynczy artykuł", amountCents: 999, articlesPerPeriod: 1 },
+  SUB20: { label: "Pakiet 20 artykułów / mies.", amountCents: 7999, articlesPerPeriod: 20 },
+  SUB30: { label: "Pakiet bez limitu / mies.", amountCents: 11999, articlesPerPeriod: Infinity },
 } as const satisfies Record<
   PurchaseType,
   { label: string; amountCents: number; articlesPerPeriod: number }
@@ -163,7 +164,7 @@ export type ReactionType = (typeof REACTION_TYPES)[number];
 // --- Author ad slots ---------------------------------------------------------
 //
 // Anyone can buy a 30-day ad slot to run under one author's published
-// articles ($50 flat). Up to AD_SLOTS_PER_AUTHOR ads can be ACTIVE for the
+// articles (199 PLN flat). Up to AD_SLOTS_PER_AUTHOR ads can be ACTIVE for the
 // same author at once. Revenue is split as a fixed table, not the tiered
 // commission scheme: 30% to the author, 30% to the platform admin(s), and
 // 10% each to the author's first 4 sponsor levels — the same incentive to
@@ -171,7 +172,7 @@ export type ReactionType = (typeof REACTION_TYPES)[number];
 // commission engine, but funded by advertisers instead of readers. See
 // src/lib/ads.ts for the distribution logic.
 
-export const AD_PRICE_CENTS = 5000;
+export const AD_PRICE_CENTS = 19900;
 export const AD_DURATION_DAYS = 30;
 export const AD_SLOTS_PER_AUTHOR = 3;
 

@@ -180,7 +180,7 @@ export default async function PanelPage({
                 >
                   <span>{label}</span>
                   <span className="text-black/60 dark:text-white/60">
-                    {(p.amountCents / 100).toFixed(2)}$ · {p.createdAt.toLocaleDateString("pl-PL")}
+                    {formatPrice(p.amountCents)} · {p.createdAt.toLocaleDateString("pl-PL")}
                   </span>
                 </li>
               );

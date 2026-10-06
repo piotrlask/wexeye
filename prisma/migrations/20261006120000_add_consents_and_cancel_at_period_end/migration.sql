@@ -7,3 +7,7 @@ ALTER TABLE `User`
 
 ALTER TABLE `Subscription`
   ADD COLUMN `cancelAtPeriodEnd` BOOLEAN NOT NULL DEFAULT false;
+
+-- Operator decision 2026-10-06: all amounts in PLN. Default only (no rows
+-- changed); manual payouts now also set the currency explicitly.
+ALTER TABLE `Payment` ALTER COLUMN `currency` SET DEFAULT 'PLN';

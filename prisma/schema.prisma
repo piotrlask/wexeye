@@ -221,7 +221,7 @@ model Payment {
   id          String   @id @default(cuid())
   description String
   amountCents Int
-  currency    String   @default("USD")
+  currency    String   @default("PLN")
   status      String   @default("PENDING")
   createdAt   DateTime @default(now())
 }

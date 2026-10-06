@@ -1,3 +1,4 @@
+import { formatPrice } from "@/lib/constants";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
@@ -20,7 +21,7 @@ export default async function AdCreativePage({ params }: { params: Promise<{ id:
       <h1 className="mb-2 text-2xl font-semibold">Twoja reklama</h1>
       <p className="mb-6 text-sm text-black/60 dark:text-white/60">
         Miejsce reklamowe pod tekstami autora <strong>{purchase.author.name}</strong> na 30 dni —{" "}
-        {(purchase.amountCents / 100).toFixed(2)}$.
+        {formatPrice(purchase.amountCents)}.
       </p>
 
       {purchase.status === "PENDING" && (

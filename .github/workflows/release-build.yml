@@ -129,6 +129,9 @@ jobs:
       - name: Lint (existing script only)
         run: npm run lint
 
+      - name: Unit tests (pricing / currency guards)
+        run: npm test
+
       - name: Build (next build)
         env:
           AUTH_URL: ${{ steps.target.outputs.auth_url }}

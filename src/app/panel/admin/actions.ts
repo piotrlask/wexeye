@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { ROLES } from "@/lib/constants";
+import { ROLES, CURRENCY } from "@/lib/constants";
 import { isAdmin } from "@/lib/access";
 import { isValidEmail } from "@/lib/email";
 import { createNotification } from "@/lib/notifications";
@@ -226,7 +226,8 @@ export async function addPaymentAction(
   }
 
   await prisma.payment.create({
-    data: { description, amountCents: Math.round(amount * 100) },
+    // Integer grosze; the form asks for PLN.
+    data: { description, amountCents: Math.round(amount * 100), currency: CURRENCY.toUpperCase() },
   });
 
   revalidatePath("/panel/admin");

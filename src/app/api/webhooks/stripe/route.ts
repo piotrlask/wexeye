@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { distributeCommission } from "@/lib/commissions";
+import { renewalUpdate } from "@/lib/subscriptionRenewal";
 import type { PurchaseType } from "@/lib/constants";
 
 export async function POST(req: NextRequest) {
@@ -34,10 +35,12 @@ export async function POST(req: NextRequest) {
         // Only marks the slot as paid-for here. Revenue isn't distributed
         // until the advertiser actually submits a creative and the ad goes
         // ACTIVE (see activateAdPurchase) — an abandoned PAID slot that never
-        // runs shouldn't pay out anyone. This update is naturally idempotent
-        // against webhook redelivery: re-setting status to PAID is a no-op.
-        await prisma.adPurchase.update({
-          where: { id: adPurchaseId },
+        // runs shouldn't pay out anyone. Only a PENDING purchase moves to PAID:
+        // a redelivered webhook must never pull an already ACTIVE ad back to
+        // PAID (that took it offline and let the advertiser "activate" it
+        // again, restarting its 30-day window without paying).
+        await prisma.adPurchase.updateMany({
+          where: { id: adPurchaseId, status: "PENDING" },
           data: { status: "PAID", stripeCheckoutId: session.id },
         });
         break;
@@ -152,14 +155,12 @@ export async function POST(req: NextRequest) {
           });
         }
 
-        await prisma.subscription.update({
-          where: { userId: existing.userId },
-          data: {
-            status: "ACTIVE",
-            currentPeriodEnd: new Date(periodEndSeconds * 1000),
-            articlesUsedInPeriod: 0,
-          },
-        });
+        // Redelivery-safe: quota resets only when the period really advances
+        // (see renewalUpdate).
+        const data = renewalUpdate(existing, periodEndSeconds, sub.status);
+        if (Object.keys(data).length > 0) {
+          await prisma.subscription.update({ where: { userId: existing.userId }, data });
+        }
       }
       break;
     }

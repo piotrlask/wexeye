@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatPrice, PAYMENT_CONSENT_TEXT, PRICING, type PurchaseType } from "@/lib/constants";
 
-export default function CheckoutButtons({ articleId }: { articleId?: string }) {
+export default function CheckoutButtons({ articleId, enabled }: { articleId?: string; enabled: boolean }) {
   const [loading, setLoading] = useState<PurchaseType | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
@@ -39,6 +39,10 @@ export default function CheckoutButtons({ articleId }: { articleId?: string }) {
       setError("Nie udało się połączyć z płatnościami.");
       setLoading(null);
     }
+  }
+
+  if (!enabled) {
+    return <p className="text-sm text-black/60 dark:text-white/60">Płatności będą dostępne wkrótce.</p>;
   }
 
   const options: PurchaseType[] = articleId ? ["ARTICLE", "SUB20", "SUB30"] : ["SUB20", "SUB30"];

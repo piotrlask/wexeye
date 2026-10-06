@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PAYMENTS_ENABLED } from "@/lib/stripe";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { formatPrice, PRICING } from "@/lib/constants";
@@ -151,7 +152,7 @@ export default async function PanelPage({
           </p>
         )}
         <div className="mt-4">
-          <CheckoutButtons />
+          <CheckoutButtons enabled={PAYMENTS_ENABLED} />
         </div>
       </section>
 

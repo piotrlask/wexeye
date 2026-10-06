@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { stripe } from "@/lib/stripe";
+import { PAYMENTS_DISABLED_MESSAGE, PAYMENTS_ENABLED, stripe } from "@/lib/stripe";
 import { hasArticleAccess, hasStaffAccess } from "@/lib/access";
 import { CURRENCY, PAYMENT_CONSENT_VERSION, PRICING, PURCHASE_TYPES, type PurchaseType } from "@/lib/constants";
 
 export async function POST(req: NextRequest) {
+  if (!PAYMENTS_ENABLED) {
+    return NextResponse.json({ error: PAYMENTS_DISABLED_MESSAGE }, { status: 503 });
+  }
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Musisz być zalogowany." }, { status: 401 });

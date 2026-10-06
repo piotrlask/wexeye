@@ -1,4 +1,5 @@
 import { getActiveAdsForAuthor } from "@/lib/ads";
+import { PAYMENTS_ENABLED } from "@/lib/stripe";
 import { AD_SLOTS_PER_AUTHOR } from "@/lib/constants";
 import BuyAdSlotButton from "./BuyAdSlotButton";
 
@@ -36,7 +37,7 @@ export default async function AdSlots({
         </a>
       ))}
       {Array.from({ length: emptySlots }).map((_, i) => (
-        <BuyAdSlotButton key={i} authorId={authorId} articleId={articleId} loggedIn={loggedIn} />
+        PAYMENTS_ENABLED ? <BuyAdSlotButton key={i} authorId={authorId} articleId={articleId} loggedIn={loggedIn} /> : null
       ))}
     </div>
   );

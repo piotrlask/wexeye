@@ -17,13 +17,18 @@ export async function POST(req: NextRequest) {
   let event: Stripe.Event;
   try {
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-  } catch (err) {
-    return NextResponse.json({ error: `Nieprawidłowy podpis: ${(err as Error).message}` }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: "Nieprawidłowy podpis webhooka." }, { status: 400 });
   }
 
   switch (event.type) {
-    case "checkout.session.completed": {
+    case "checkout.session.completed":
+    case "checkout.session.async_payment_succeeded": {
       const session = event.data.object as Stripe.Checkout.Session;
+      // Delayed-notification methods (e.g. bank transfers) complete the session
+      // before the money arrives (payment_status "unpaid"); access is granted
+      // only once Stripe reports it paid — here or in async_payment_succeeded.
+      if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") break;
       const adPurchaseId = session.metadata?.adPurchaseId;
       if (adPurchaseId) {
         // Only marks the slot as paid-for here. Revenue isn't distributed

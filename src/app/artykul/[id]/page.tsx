@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { PAYMENTS_ENABLED } from "@/lib/stripe";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -218,7 +219,7 @@ export default async function ArticlePage({
           {userId ? (
             <div className="flex flex-col gap-3">
               {subscriptionUsable && <UnlockButton articleId={article.id} remaining={remaining} />}
-              <CheckoutButtons articleId={article.id} />
+              <CheckoutButtons articleId={article.id} enabled={PAYMENTS_ENABLED} />
             </div>
           ) : (
             <p className="text-sm text-black/60 dark:text-white/60">

@@ -30,3 +30,10 @@ test("ad webhook only moves PENDING purchases to PAID (an ACTIVE ad is never pul
   assert.match(src, /adPurchase\.updateMany\(\{\s*where: \{ id: adPurchaseId, status: "PENDING" \}/);
   assert.doesNotMatch(src, /adPurchase\.update\(\{\s*where: \{ id: adPurchaseId \}/);
 });
+
+test("checkout events for unknown users/articles are acknowledged before any write (no 500 retry loop)", () => {
+  const src = readFileSync(new URL("../src/app/api/webhooks/stripe/route.ts", import.meta.url), "utf8");
+  const guard = src.indexOf("if (!knownUser || !knownArticle)");
+  assert.ok(guard > 0);
+  assert.ok(guard < src.indexOf("prisma.purchase.create"));
+});

@@ -61,6 +61,20 @@ export async function POST(req: NextRequest) {
       });
       if (alreadyProcessed) break;
 
+      // An event can reference rows this database doesn't have (a session
+      // created by another environment sharing the Stripe account, or a
+      // record removed since). Acknowledge it instead of failing with 500 —
+      // Stripe would keep retrying for days and eventually disable the endpoint.
+      const knownUser = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+      const knownArticle =
+        type !== "ARTICLE" || !articleId
+          ? true
+          : Boolean(await prisma.article.findUnique({ where: { id: articleId }, select: { id: true } }));
+      if (!knownUser || !knownArticle) {
+        console.error("stripe webhook: checkout session references an unknown user/article — acknowledged, nothing granted");
+        break;
+      }
+
       const amountCents = session.amount_total ?? 0;
 
       if (type === "ARTICLE" && articleId) {

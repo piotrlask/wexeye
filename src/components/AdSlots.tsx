@@ -27,7 +27,7 @@ export default async function AdSlots({
         >
           {ad.mediaType === "PHOTO" ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={ad.mediaUrl ?? ""} alt="" className="h-32 w-full object-cover" />
+            <img src={ad.mediaUrl ?? ""} alt="" loading="lazy" decoding="async" className="h-32 w-full object-cover" />
           ) : (
             <video src={ad.mediaUrl ?? ""} muted loop autoPlay playsInline className="h-32 w-full object-cover" />
           )}

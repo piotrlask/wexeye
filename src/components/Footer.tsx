@@ -29,7 +29,7 @@ export default function Footer() {
             ))}
           </ul>
         </nav>
-        <p className="text-xs text-black/50 dark:text-white/50">
+        <p className="text-xs text-black/60 dark:text-white/60">
           © {new Date().getFullYear()} {OPERATOR.name}
         </p>
       </div>

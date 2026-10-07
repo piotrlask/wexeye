@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
@@ -8,6 +9,15 @@ import FriendButton from "@/components/FriendButton";
 import Avatar from "@/components/Avatar";
 
 const ROLE_LABELS: Record<string, string> = { ADMIN: "administrator", EDITOR: "redaktor", READER: "czytelnik" };
+
+// P1-04: profiles carry personal data (city, age, friends) — titled for
+// sharing but kept out of search indexes.
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const user = await prisma.user.findUnique({ where: { id }, select: { name: true, deletedAt: true } });
+  if (!user || user.deletedAt) return { title: "Nie znaleziono strony", robots: { index: false } };
+  return { title: `Profil: ${user.name}`, alternates: { canonical: `/profil/${id}` }, robots: { index: false, follow: true } };
+}
 
 export default async function ProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -88,7 +98,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                     <Avatar name={f.name} avatarUrl={f.avatarUrl} size="sm" />
                     <span>
                       {f.name}
-                      {f.city && <span className="text-black/50 dark:text-white/50"> · {f.city}</span>}
+                      {f.city && <span className="text-black/60 dark:text-white/60"> · {f.city}</span>}
                     </span>
                   </Link>
                 </li>

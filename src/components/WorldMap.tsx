@@ -51,9 +51,9 @@ export default function WorldMap({ posts }: { posts: MapPost[] }) {
             <div className="flex flex-col gap-1">
               {post.coverUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={post.coverUrl} alt="" className="h-20 w-full rounded object-cover" />
+                <img src={post.coverUrl} alt="" loading="lazy" decoding="async" className="h-20 w-full rounded object-cover" />
               )}
-              <span className="text-xs uppercase text-black/50">
+              <span className="text-xs uppercase text-black/60">
                 {POST_TYPE_LABELS[post.postType as PostType] ?? post.postType} · {post.category}
               </span>
               <Link href={`/artykul/${post.id}`} className="font-medium underline">
@@ -64,7 +64,7 @@ export default function WorldMap({ posts }: { posts: MapPost[] }) {
                 {post.city ? ` · ${post.city}${post.country ? `, ${post.country}` : ""}` : ""}
               </span>
               {post.publishedAt && (
-                <span className="text-xs text-black/50">
+                <span className="text-xs text-black/60">
                   {new Date(post.publishedAt).toLocaleDateString("pl-PL")}
                 </span>
               )}

@@ -85,7 +85,7 @@ export default function ModerationItem({
           not add any new public route: these media URLs are the same ones
           already written under public/uploads by addContentAction. */}
       <details className="text-black/70 dark:text-white/70">
-        <summary className="cursor-pointer text-xs font-medium text-black/50 dark:text-white/50">
+        <summary className="cursor-pointer text-xs font-medium text-black/60 dark:text-white/60">
           Podgląd treści
         </summary>
         <p className="mt-2 whitespace-pre-wrap leading-relaxed">{body}</p>

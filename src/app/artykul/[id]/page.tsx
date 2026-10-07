@@ -1,4 +1,6 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { articleDescription } from "@/lib/seo";
 import { PAYMENTS_ENABLED } from "@/lib/stripe";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
@@ -21,6 +23,47 @@ import Avatar from "@/components/Avatar";
 import AdSlots from "@/components/AdSlots";
 import ViewTracker from "./ViewTracker";
 import AdminTakedown from "./AdminTakedown";
+
+// P1-04: per-article title/description/canonical/OG. Only PUBLISHED articles
+// get real metadata (anything else renders the 404 page); the description and
+// social snippet are cut from the FREE preview half only, never the paid part.
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const article = await prisma.article.findUnique({
+    where: { id },
+    select: {
+      title: true,
+      body: true,
+      status: true,
+      publishedAt: true,
+      city: true,
+      locationHidden: true,
+      author: { select: { name: true, deletedAt: true } },
+      media: { where: { type: "PHOTO", quarantinedAt: null }, select: { url: true }, take: 1 },
+    },
+  });
+  if (!article || article.status !== "PUBLISHED") return { title: "Nie znaleziono strony", robots: { index: false } };
+  const description = articleDescription(article.body);
+  const url = `/artykul/${id}`;
+  // A page-level openGraph object replaces the layout's, so articles without a
+  // photo fall back to the site card explicitly.
+  const image = article.media[0]?.url ?? "/og.png";
+  return {
+    title: article.title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "article",
+      url,
+      title: article.title,
+      description,
+      publishedTime: article.publishedAt?.toISOString(),
+      authors: article.author.deletedAt ? undefined : [article.author.name],
+      images: [{ url: image }],
+    },
+    twitter: { card: "summary_large_image", title: article.title, description, images: [image] },
+  };
+}
 
 export default async function ArticlePage({
   params,
@@ -105,7 +148,7 @@ export default async function ArticlePage({
 
   return (
     <article className="mx-auto max-w-2xl">
-      <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
+      <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-black/60 dark:text-white/60">
         <span className="rounded bg-black/5 px-1.5 py-0.5 dark:bg-white/10">
           {POST_TYPE_LABELS[article.postType as PostType] ?? article.postType}
         </span>
@@ -159,7 +202,7 @@ export default async function ArticlePage({
             ? restMedia.map((m) =>
                 m.type === "PHOTO" ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img key={m.id} src={m.url} alt="" className="w-full rounded-lg" />
+                  <img key={m.id} src={m.url} alt="" loading="lazy" decoding="async" className="w-full rounded-lg" />
                 ) : (
                   <video key={m.id} src={m.url} controls className="w-full rounded-lg" />
                 )
@@ -190,7 +233,7 @@ export default async function ArticlePage({
 
       {!alreadyViewedRecently && <ViewTracker articleId={article.id} />}
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4 text-sm text-black/50 dark:border-white/10 dark:text-white/50">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4 text-sm text-black/60 dark:border-white/10 dark:text-white/60">
         <span>
           {article.viewCount + (alreadyViewedRecently ? 0 : 1)} wyświetleń · {article._count.comments}{" "}
           {article._count.comments === 1 ? "komentarz" : "komentarzy"}
@@ -263,7 +306,7 @@ export default async function ArticlePage({
                 <div>
                   <p className="flex items-center gap-2 text-sm font-medium">
                     {c.author.name}
-                    <span className="text-xs font-normal text-black/50 dark:text-white/50">
+                    <span className="text-xs font-normal text-black/60 dark:text-white/60">
                       {c.createdAt.toLocaleString("pl-PL")}
                     </span>
                   </p>

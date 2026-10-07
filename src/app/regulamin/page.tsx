@@ -5,7 +5,8 @@ import { AD_DURATION_DAYS, AD_PRICE_CENTS, formatPrice, PRICING } from "@/lib/co
 import { OPERATOR, CONTACT_EMAILS, MIN_AGE, MIN_AGE_WITH_PARENTAL_CONSENT } from "@/lib/legal";
 
 export const metadata: Metadata = {
-  title: "Regulamin WexEye",
+  title: "Regulamin",
+  alternates: { canonical: "/regulamin" },
   description:
     "Regulamin serwisu WexEye prowadzonego przez APIL Sp. z o.o.: konta, treści użytkowników, treści zabronione, moderacja, płatności i usuwanie konta.",
 };

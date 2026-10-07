@@ -80,7 +80,7 @@ export default async function NavBar() {
               <Link href="/panel" className="flex items-center gap-2 hover:underline">
                 <Avatar name={user.name ?? "?"} avatarUrl={avatarUrl} size="sm" />
                 {user.name}{" "}
-                <span className="text-black/50 dark:text-white/50">
+                <span className="text-black/60 dark:text-white/60">
                   ({user.role === "ADMIN" ? "administrator" : user.role === "EDITOR" ? "redaktor" : "czytelnik"})
                 </span>
               </Link>

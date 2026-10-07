@@ -76,7 +76,7 @@ export default async function ZnajomiPage({
                   <Link href={`/profil/${u.id}`} className="flex items-center gap-3 hover:underline">
                     <Avatar name={u.name} avatarUrl={u.avatarUrl} size="sm" />
                     {u.name}
-                    {u.city && <span className="text-black/50 dark:text-white/50"> · {u.city}</span>}
+                    {u.city && <span className="text-black/60 dark:text-white/60"> · {u.city}</span>}
                   </Link>
                   <FriendButton targetUserId={u.id} relation="none" />
                 </li>
@@ -99,7 +99,7 @@ export default async function ZnajomiPage({
                   <Avatar name={f.requester.name} avatarUrl={f.requester.avatarUrl} size="sm" />
                   {f.requester.name}
                   {f.requester.city && (
-                    <span className="text-black/50 dark:text-white/50"> · {f.requester.city}</span>
+                    <span className="text-black/60 dark:text-white/60"> · {f.requester.city}</span>
                   )}
                 </Link>
                 <FriendButton targetUserId={f.requester.id} relation="pending-received" friendshipId={f.id} />
@@ -122,7 +122,7 @@ export default async function ZnajomiPage({
                   <Avatar name={f.addressee.name} avatarUrl={f.addressee.avatarUrl} size="sm" />
                   {f.addressee.name}
                   {f.addressee.city && (
-                    <span className="text-black/50 dark:text-white/50"> · {f.addressee.city}</span>
+                    <span className="text-black/60 dark:text-white/60"> · {f.addressee.city}</span>
                   )}
                 </Link>
                 <FriendButton targetUserId={f.addressee.id} relation="pending-sent" friendshipId={f.id} />
@@ -146,7 +146,7 @@ export default async function ZnajomiPage({
                 >
                   <Avatar name={f.name} avatarUrl={f.avatarUrl} size="sm" />
                   {f.name}
-                  {f.city && <span className="text-black/50 dark:text-white/50"> · {f.city}</span>}
+                  {f.city && <span className="text-black/60 dark:text-white/60"> · {f.city}</span>}
                 </Link>
               </li>
             ))}

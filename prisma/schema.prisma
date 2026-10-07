@@ -371,3 +371,21 @@ model PasswordResetToken {
 
   @@index([userId])
 }
+
+// P1-12: append-only trail of admin actions (who, what, on which record, when).
+// actorId/targetId are plain ids (no FK) — users are only ever soft-deleted and
+// the trail must survive anything that happens to the referenced rows.
+// `details` holds a short, non-sensitive summary only: never passwords, e-mail
+// addresses or free-text reasons (those stay on the target row itself).
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  action     String   @db.VarChar(64)
+  targetType String   @db.VarChar(32)
+  targetId   String?  @db.VarChar(191)
+  details    String?  @db.VarChar(500)
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorId])
+}

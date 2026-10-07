@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { CATEGORIES } from "@/lib/constants";
 import { getFeedPosts } from "@/lib/feed";
 import PostCard from "@/components/PostCard";
+
+export const metadata: Metadata = { title: "Eksploruj", alternates: { canonical: "/eksploruj" } };
 
 export default async function EksplorujPage() {
   const session = await auth();

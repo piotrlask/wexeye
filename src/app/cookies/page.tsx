@@ -4,7 +4,8 @@ import { LegalPage, LegalSection, Para, Bullets, MailLink } from "@/components/L
 import { CONTACT_EMAILS } from "@/lib/legal";
 
 export const metadata: Metadata = {
-  title: "Cookies — WexEye",
+  title: "Cookies",
+  alternates: { canonical: "/cookies" },
   description:
     "Informacja o plikach cookies stosowanych w serwisie WexEye: sesja i bezpieczeństwo logowania oraz licznik wyświetleń artykułu.",
 };

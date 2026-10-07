@@ -59,7 +59,7 @@ export default function NotificationsClient({
                 {unread && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-blue-600" aria-label="nieprzeczytane" />}
               </div>
               <p className="text-black/70 dark:text-white/70">{n.message}</p>
-              <p className="mt-1 text-xs text-black/50 dark:text-white/50">{n.createdAt.toLocaleString("pl-PL")}</p>
+              <p className="mt-1 text-xs text-black/60 dark:text-white/60">{n.createdAt.toLocaleString("pl-PL")}</p>
             </>
           );
 

@@ -45,7 +45,7 @@ export default function RejestracjaForm() {
             autoComplete="new-password"
             className="rounded border border-black/20 px-3 py-2 dark:border-white/20"
           />
-          <span className="text-xs text-black/50 dark:text-white/50">Minimum 10 znaków.</span>
+          <span className="text-xs text-black/60 dark:text-white/60">Minimum 10 znaków.</span>
         </label>
         <label className="flex flex-col gap-1 text-sm">
           Powtórz hasło

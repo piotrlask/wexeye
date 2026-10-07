@@ -74,7 +74,7 @@ export default function BuyAdSlotButton({
       <span className="font-medium">
         {loading ? "Przekierowywanie..." : "Wykup reklamę"}
       </span>
-      <span className="text-xs text-black/50 dark:text-white/50">
+      <span className="text-xs text-black/60 dark:text-white/60">
         pod tekstami tego autora · {formatPrice(AD_PRICE_CENTS)} / 30 dni
       </span>
       {error && <span className="text-xs text-red-600">{error}</span>}

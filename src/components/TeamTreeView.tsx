@@ -25,7 +25,7 @@ function TeamNodeItem({ node }: { node: TeamNode }) {
       <div className="flex items-center gap-2 text-sm">
         <StatusDot node={node} />
         <span className="font-medium">{node.name}</span>
-        <span className="text-xs text-black/50 dark:text-white/50">
+        <span className="text-xs text-black/60 dark:text-white/60">
           {ROLE_LABELS[node.role] ?? node.role} · zespół {node.directCount}/5
           {!node.postedThisWeek && " · brak tekstu w tym tygodniu"}
         </span>
@@ -43,7 +43,7 @@ function TeamNodeItem({ node }: { node: TeamNode }) {
 
 export function TeamTreeLegend() {
   return (
-    <p className="text-xs text-black/50 dark:text-white/50">
+    <p className="text-xs text-black/60 dark:text-white/60">
       <span className="mr-1 inline-block h-2 w-2 rounded-full bg-green-500 align-middle" /> na bieżąco
       (tekst w tym tygodniu + pełny zespół 5/5) &nbsp;
       <span className="mr-1 inline-block h-2 w-2 rounded-full bg-red-500 align-middle" /> zaległości
@@ -66,7 +66,7 @@ export default function TeamTreeView({
     <div>
       <div className="mb-3 flex items-center gap-2 text-sm">
         <span className="font-semibold">{root.name}</span>
-        <span className="text-xs text-black/50 dark:text-white/50">
+        <span className="text-xs text-black/60 dark:text-white/60">
           {isSelf ? "(Ty)" : ROLE_LABELS[root.role] ?? root.role} · {root.directCount}/5 bezpośrednio
           zrekrutowanych · {totalCount} osób łącznie w zespole (do 5 poziomów w dół)
         </span>

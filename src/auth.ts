@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import { CredentialsSignin } from "next-auth";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { issuedBeforePasswordChange } from "@/lib/sessionValidity";
 import { getClientIpFromRequest, checkLoginRateLimit, recordFailedLogin } from "@/lib/rateLimit";
 
 // Distinct `CredentialsSignin` subclass for the rate-limit rejection below —
@@ -103,7 +104,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // the deliberate, permanent source of truth (see schema.prisma), not
       // an accident of timing, so it's checked explicitly and independently.
       if (dbUser.deletedAt) return null;
-      if (dbUser.passwordChangedAt && token.iat && dbUser.passwordChangedAt.getTime() / 1000 > token.iat) {
+      if (issuedBeforePasswordChange(dbUser.passwordChangedAt, token.iat)) {
         return null;
       }
 

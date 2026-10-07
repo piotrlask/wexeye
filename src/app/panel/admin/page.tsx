@@ -12,12 +12,14 @@ import TakedownRow from "./TakedownRow";
 import QuarantineRepairForm from "./QuarantineRepairForm";
 import { getQuarantineOverview, type QuarantineSeverity } from "@/lib/mediaQuarantine";
 import TeamTreeView, { TeamTreeLegend } from "@/components/TeamTreeView";
+import type { AdminAction } from "@/lib/adminAudit";
 
 const ROLE_LABELS: Record<string, string> = { ADMIN: "Administrator", EDITOR: "Redaktor" };
 
 const TABS = [
   { key: "zarzadzanie", label: "Zarządzanie" },
   { key: "redakcja", label: "Redakcja" },
+  { key: "dziennik", label: "Dziennik działań" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -58,7 +60,7 @@ export default async function AdminPage({
         ))}
       </div>
 
-      {tab === "zarzadzanie" ? <ManagementTab /> : <TeamTab />}
+      {tab === "zarzadzanie" ? <ManagementTab /> : tab === "redakcja" ? <TeamTab /> : <AuditTab />}
     </div>
   );
 }
@@ -197,7 +199,7 @@ async function ManagementTab() {
               className="flex items-center justify-between rounded border border-black/10 px-3 py-2 text-sm dark:border-white/10"
             >
               <span>
-                {u.name} <span className="text-black/50 dark:text-white/50">({u.email})</span>
+                {u.name} <span className="text-black/60 dark:text-white/60">({u.email})</span>
               </span>
               <span className="text-black/60 dark:text-white/60">
                 {ROLE_LABELS[u.role] ?? u.role}
@@ -354,5 +356,67 @@ async function TeamTab() {
         </div>
       )}
     </div>
+  );
+}
+
+const ACTION_LABELS: Record<AdminAction, string> = {
+  USER_CREATED: "Utworzenie konta (rola)",
+  ARTICLE_APPROVED: "Zatwierdzenie artykułu",
+  ARTICLE_REJECTED: "Odrzucenie artykułu",
+  PAYMENT_ADDED: "Dodanie wypłaty",
+  PAYMENT_MARKED_PAID: "Oznaczenie wypłaty jako opłaconej",
+  ARTICLE_TAKEN_DOWN: "Awaryjne ukrycie artykułu",
+  QUARANTINE_RETRY: "Ponowienie kwarantanny mediów",
+  QUARANTINE_RECONCILE: "Sprawdzenie kwarantanny mediów",
+  COMMENT_HIDDEN: "Awaryjne ukrycie komentarza",
+};
+
+// P1-12: read-only view of the admin audit trail (last 100 entries).
+async function AuditTab() {
+  const entries = await prisma.adminAuditLog.findMany({ orderBy: { createdAt: "desc" }, take: 100 });
+  const actors = await prisma.user.findMany({
+    where: { id: { in: [...new Set(entries.map((e) => e.actorId))] } },
+    select: { id: true, name: true },
+  });
+  const actorName = new Map(actors.map((a) => [a.id, a.name]));
+
+  return (
+    <section>
+      <h2 className="mb-2 text-lg font-semibold">Dziennik działań administratora</h2>
+      <p className="mb-4 text-sm text-black/60 dark:text-white/60">
+        Kto, co i kiedy zrobił w panelu (ostatnie 100 wpisów). Wpisy nie zawierają haseł, adresów e-mail ani treści powodów.
+      </p>
+      {entries.length === 0 ? (
+        <p className="text-sm text-black/60 dark:text-white/60">Brak wpisów.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-black/10 dark:border-white/10">
+                <th className="py-2 pr-4">Czas</th>
+                <th className="py-2 pr-4">Administrator</th>
+                <th className="py-2 pr-4">Działanie</th>
+                <th className="py-2 pr-4">Obiekt</th>
+                <th className="py-2">Szczegóły</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((e) => (
+                <tr key={e.id} className="border-b border-black/5 dark:border-white/5">
+                  <td className="py-2 pr-4 whitespace-nowrap">{e.createdAt.toLocaleString("pl-PL", { timeZone: "Europe/Warsaw" })}</td>
+                  <td className="py-2 pr-4">{actorName.get(e.actorId) ?? "—"}</td>
+                  <td className="py-2 pr-4">{ACTION_LABELS[e.action as AdminAction] ?? e.action}</td>
+                  <td className="py-2 pr-4 font-mono text-xs">
+                    {e.targetType}
+                    {e.targetId ? ` ${e.targetId}` : ""}
+                  </td>
+                  <td className="py-2">{e.details ?? ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }

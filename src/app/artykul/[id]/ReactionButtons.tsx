@@ -58,7 +58,7 @@ export default function ReactionButtons({
         {notOkCount}
       </button>
       {!loggedIn && (
-        <span className="text-xs text-black/50 dark:text-white/50">
+        <span className="text-xs text-black/60 dark:text-white/60">
           <a href="/login" className="underline">
             Zaloguj się
           </a>

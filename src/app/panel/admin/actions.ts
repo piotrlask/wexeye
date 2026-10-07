@@ -19,6 +19,7 @@ import {
 } from "@/lib/mediaQuarantine";
 import { QUARANTINE_BATCH_SIZE } from "@/lib/constants";
 import { fitsVarchar, VARCHAR_191_MAX } from "@/lib/validation";
+import { recordAdminAction } from "@/lib/adminAudit";
 
 async function requireAdmin() {
   const session = await auth();
@@ -84,7 +85,7 @@ export async function createEditorAction(
   _prevState: FormState | undefined,
   formData: FormData
 ): Promise<FormState> {
-  await requireAdmin();
+  const adminSession = await requireAdmin();
 
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -116,7 +117,8 @@ export async function createEditorAction(
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  await prisma.user.create({ data: { name, email, passwordHash, role } });
+  const created = await prisma.user.create({ data: { name, email, passwordHash, role }, select: { id: true } });
+  await recordAdminAction(adminSession.user!.id!, "USER_CREATED", { type: "User", id: created.id }, `rola ${role}`);
 
   revalidatePath("/panel/admin");
   return { success: true };
@@ -139,7 +141,7 @@ export async function moderateArticleAction(
   approve: boolean,
   note?: string
 ): Promise<FormState> {
-  await requireAdmin();
+  const adminSession = await requireAdmin();
 
   // Optional even on reject; trimmed and length-checked before anything else
   // so a bad note never gets as far as a DB write.
@@ -202,6 +204,7 @@ export async function moderateArticleAction(
   if (!moderated) {
     return { error: "Ten artykuł nie oczekuje już na moderację (mógł zostać już przetworzony)." };
   }
+  await recordAdminAction(adminSession.user!.id!, approve ? "ARTICLE_APPROVED" : "ARTICLE_REJECTED", { type: "Article", id: articleId }, !approve && trimmedNote ? "z notatką dla autora" : undefined);
 
   revalidatePath("/panel/admin");
   revalidatePath("/panel/dodaj");
@@ -213,7 +216,7 @@ export async function addPaymentAction(
   _prevState: FormState | undefined,
   formData: FormData
 ): Promise<FormState> {
-  await requireAdmin();
+  const adminSession = await requireAdmin();
 
   const description = String(formData.get("description") ?? "").trim();
   const amount = Number(formData.get("amount"));
@@ -225,17 +228,19 @@ export async function addPaymentAction(
     return { error: `Opis jest za długi (maksymalnie ${VARCHAR_191_MAX} znaków).` };
   }
 
-  await prisma.payment.create({
+  const payment = await prisma.payment.create({
     // Integer grosze; the form asks for PLN.
     data: { description, amountCents: Math.round(amount * 100), currency: CURRENCY.toUpperCase() },
+    select: { id: true, amountCents: true },
   });
+  await recordAdminAction(adminSession.user!.id!, "PAYMENT_ADDED", { type: "Payment", id: payment.id }, `${payment.amountCents} gr`);
 
   revalidatePath("/panel/admin");
   return { success: true };
 }
 
 export async function markPaymentPaidAction(paymentId: string): Promise<FormState> {
-  await requireAdmin();
+  const adminSession = await requireAdmin();
 
   // Same reasoning as moderateArticleAction above: Payment rows are never
   // deleted anywhere in this app, so this pre-check is sufficient to turn a
@@ -246,6 +251,7 @@ export async function markPaymentPaidAction(paymentId: string): Promise<FormStat
   }
 
   await prisma.payment.update({ where: { id: paymentId }, data: { status: "PAID" } });
+  await recordAdminAction(adminSession.user!.id!, "PAYMENT_MARKED_PAID", { type: "Payment", id: paymentId });
   revalidatePath("/panel/admin");
   return { success: true };
 }
@@ -342,6 +348,7 @@ export async function emergencyTakedownArticleAction(
   // admin's result message with a 404 screen.
   revalidatePath("/panel/admin");
 
+  if (outcome === "DONE") await recordAdminAction(adminId, "ARTICLE_TAKEN_DOWN", { type: "Article", id: articleId }, `kwarantanna mediów: ${severity}`);
   const head = outcome === "DONE" ? "Artykuł został ukryty awaryjnie." : "Artykuł był już ukryty.";
   return { success: true, message: `${head} ${quarantine}`, severity };
 }
@@ -369,6 +376,7 @@ export async function retryArticleQuarantineAction(
   if (article.status !== "TAKEN_DOWN") return { error: "Artykuł nie jest ukryty awaryjnie." };
 
   const quarantineResult = await runQuarantine(articleId);
+  await recordAdminAction(adminId, "QUARANTINE_RETRY", { type: "Article", id: articleId }, quarantineResult ? `wynik: ${quarantineSeverity(quarantineResult)}` : "wynik: CRITICAL");
   revalidatePath("/panel/admin");
   return {
     success: true,
@@ -406,6 +414,7 @@ export async function reconcileQuarantineAction(
     return { success: true, severity: "CRITICAL", message: "Nie udało się wykonać sprawdzenia kwarantanny — ponów operację." };
   }
   const { health, result } = outcome;
+  await recordAdminAction(adminId, "QUARANTINE_RECONCILE", { type: "Media" }, `sprawdzono ${result.checked}, kwarantanna: ${health.status}`);
 
   revalidatePath("/panel/admin");
   const severity = quarantineSeverity(result);
@@ -478,6 +487,7 @@ export async function emergencyHideCommentAction(
   if (outcome === "NOT_FOUND") return { error: "Komentarz nie istnieje." };
 
   if (articleId) revalidatePath(`/artykul/${articleId}`);
+  if (outcome === "DONE") await recordAdminAction(adminId, "COMMENT_HIDDEN", { type: "Comment", id: commentId });
   return {
     success: true,
     message: outcome === "DONE" ? "Komentarz został ukryty awaryjnie." : "Komentarz był już ukryty.",

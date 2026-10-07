@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { CATEGORIES, FEED_TABS, type FeedTabKey } from "@/lib/constants";
 import { getFeedPosts } from "@/lib/feed";
 import PostCard from "@/components/PostCard";
 import NearYouLocation from "@/components/NearYouLocation";
+
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 export default async function HomePage({
   searchParams,

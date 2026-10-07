@@ -4,7 +4,8 @@ import { LegalPage, LegalSection, Para, Bullets, MailLink } from "@/components/L
 import { OPERATOR, CONTACT_EMAILS } from "@/lib/legal";
 
 export const metadata: Metadata = {
-  title: "Kontakt i dane operatora — WexEye",
+  title: "Kontakt i dane operatora",
+  alternates: { canonical: "/kontakt" },
   description:
     "Dane operatora serwisu WexEye (APIL Sp. z o.o.) oraz adresy kontaktowe w sprawach ogólnych, prywatności, prawnych, praw autorskich i bezpieczeństwa.",
 };

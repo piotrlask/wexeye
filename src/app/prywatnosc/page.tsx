@@ -4,7 +4,8 @@ import { LegalPage, LegalSection, Para, Bullets, MailLink } from "@/components/L
 import { OPERATOR, CONTACT_EMAILS, HOSTING_PROVIDER, MIN_AGE, MIN_AGE_WITH_PARENTAL_CONSENT } from "@/lib/legal";
 
 export const metadata: Metadata = {
-  title: "Polityka prywatności WexEye",
+  title: "Polityka prywatności",
+  alternates: { canonical: "/prywatnosc" },
   description:
     "Polityka prywatności serwisu WexEye: administrator danych (APIL Sp. z o.o.), kategorie danych, odbiorcy, prawa użytkownika i skutki usunięcia konta.",
 };

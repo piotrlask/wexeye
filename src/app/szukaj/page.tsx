@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getAccessibleArticleIds, previewBody } from "@/lib/access";
 import PostCard from "@/components/PostCard";
 import { toFeedPost, type FeedPost } from "@/lib/feed";
+
+export const metadata: Metadata = { title: "Szukaj", robots: { index: false, follow: true } };
 
 export default async function SzukajPage({
   searchParams,
@@ -100,7 +103,7 @@ export default async function SzukajPage({
                   key={p.id}
                   className="rounded border border-black/10 px-3 py-2 text-sm dark:border-white/10"
                 >
-                  {p.name} <span className="text-black/50 dark:text-white/50">({p.role})</span>
+                  {p.name} <span className="text-black/60 dark:text-white/60">({p.role})</span>
                 </li>
               ))}
             </ul>

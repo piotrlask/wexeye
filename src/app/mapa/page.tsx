@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import MapLoader from "@/components/MapLoader";
 import type { MapPost } from "@/components/WorldMap";
+
+export const metadata: Metadata = { title: "Mapa zdarzeń", alternates: { canonical: "/mapa" } };
 
 export default async function MapaPage() {
   const articles = await prisma.article.findMany({

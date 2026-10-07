@@ -7,7 +7,7 @@ const WorldMap = dynamic(() => import("./WorldMap"), {
   ssr: false,
   loading: () => (
     <div className="flex h-[70vh] w-full items-center justify-center rounded-lg border border-black/10 dark:border-white/10">
-      <p className="text-sm text-black/50 dark:text-white/50">Ładowanie mapy…</p>
+      <p className="text-sm text-black/60 dark:text-white/60">Ładowanie mapy…</p>
     </div>
   ),
 });

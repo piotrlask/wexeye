@@ -19,7 +19,7 @@ export default function PostCard({ post }: { post: FeedPost }) {
     >
       {photoCover && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={photoCover.url} alt={post.title} className="h-40 w-full object-cover" />
+        <img src={photoCover.url} alt={post.title} loading="lazy" decoding="async" className="h-40 w-full object-cover" />
       )}
       {videoCover && (
         <div className="relative h-40 w-full bg-black">
@@ -34,7 +34,7 @@ export default function PostCard({ post }: { post: FeedPost }) {
         </div>
       )}
       <div className="p-4">
-        <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-black/50 dark:text-white/50">
+        <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-black/60 dark:text-white/60">
           <span className="rounded bg-black/5 px-1.5 py-0.5 dark:bg-white/10">
             {POST_TYPE_LABELS[post.postType as keyof typeof POST_TYPE_LABELS] ?? post.postType}
           </span>
@@ -42,7 +42,7 @@ export default function PostCard({ post }: { post: FeedPost }) {
         </div>
         <h2 className="mt-1 text-lg font-semibold">{post.title}</h2>
         <p className="mt-2 line-clamp-2 text-sm text-black/70 dark:text-white/70">{post.body}</p>
-        <p className="mt-3 flex flex-wrap gap-x-2 text-xs text-black/50 dark:text-white/50">
+        <p className="mt-3 flex flex-wrap gap-x-2 text-xs text-black/60 dark:text-white/60">
           <span>{post.author.name}</span>
           <span>·</span>
           <span>{post.publishedAt?.toLocaleDateString("pl-PL")}</span>

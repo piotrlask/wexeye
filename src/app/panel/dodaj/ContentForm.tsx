@@ -144,7 +144,7 @@ export default function ContentForm() {
               {locating ? "Ustalanie…" : "Użyj mojej lokalizacji (GPS)"}
             </button>
             {coords && (
-              <span className="text-xs text-black/50 dark:text-white/50">
+              <span className="text-xs text-black/60 dark:text-white/60">
                 {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
               </span>
             )}

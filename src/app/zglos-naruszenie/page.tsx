@@ -4,7 +4,8 @@ import { LegalPage, LegalSection, Para, Bullets, MailLink } from "@/components/L
 import { CONTACT_EMAILS } from "@/lib/legal";
 
 export const metadata: Metadata = {
-  title: "Zgłoś naruszenie — WexEye",
+  title: "Zgłoś naruszenie",
+  alternates: { canonical: "/zglos-naruszenie" },
   description:
     "Jak zgłosić do WexEye treść nielegalną, naruszenie praw autorskich, materiał intymny opublikowany bez zgody (NCII), zagrożenie dla dzieci lub inne naruszenie zasad. Zgłoszenie nie wymaga konta.",
 };

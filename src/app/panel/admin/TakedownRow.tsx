@@ -30,7 +30,7 @@ export default function TakedownRow({
       </p>
       <p className="mt-1 break-words text-black/70 dark:text-white/70">Powód: {reason}</p>
       <div className="mt-2 flex flex-wrap items-center gap-3">
-        <span className={unquarantinedMedia > 0 ? "text-red-700 dark:text-red-400" : "text-black/50 dark:text-white/50"}>
+        <span className={unquarantinedMedia > 0 ? "text-red-700 dark:text-red-400" : "text-black/60 dark:text-white/60"}>
           Media bez kwarantanny: {unquarantinedMedia}
         </span>
         <form action={formAction}>

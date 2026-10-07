@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Nie znaleziono strony — WexEye",
+  title: "Nie znaleziono strony",
   robots: { index: false },
 };
 

@@ -4,7 +4,8 @@ import { LegalPage, LegalSection, Para, Bullets, MailLink } from "@/components/L
 import { CONTACT_EMAILS } from "@/lib/legal";
 
 export const metadata: Metadata = {
-  title: "Zasady społeczności — WexEye",
+  title: "Zasady społeczności",
+  alternates: { canonical: "/zasady-spolecznosci" },
   description:
     "Zasady społeczności WexEye: jakie treści są dozwolone, co jest zabronione (m.in. CSAM, NCII, nękanie, doxxing, oszustwa), treści polityczne i reklamy polityczne oraz jak zgłaszać naruszenia.",
 };
